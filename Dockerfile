@@ -51,9 +51,9 @@ COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Environment Defaults
-ENV PORT=80
+ENV PORT=7860
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
-EXPOSE 80
+EXPOSE 7860
 
 ENTRYPOINT ["docker-entrypoint.sh"]
