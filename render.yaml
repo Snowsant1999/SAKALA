@@ -10,7 +10,7 @@ services:
       - key: APP_DEBUG
         value: "false"
       - key: APP_KEY
-        value: base64:s9r1K6F8kH7f0vQ4aZ9P1eX7mB3yN5kO6L4uP8iQ2wM=
+        value: base64:fwehU8LdeWKHK5IBW0exB7ken+3vP6Vs7fNuZSmwkmw=
       - key: APP_URL
         value: https://sakala-web.onrender.com
       - key: SESSION_DRIVER

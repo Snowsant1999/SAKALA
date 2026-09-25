@@ -46,11 +46,15 @@ COPY apache.conf /etc/apache2/sites-available/000-default.conf
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
+# Prepare permissions for root & non-root containers (e.g. Hugging Face Spaces UID 1000)
+RUN mkdir -p /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database /var/run/apache2 /var/lock/apache2 /var/log/apache2 \
+    && chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/database /var/run/apache2 /var/lock/apache2 /var/log/apache2
+
 # Copy and set entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Environment Defaults
+# Environment Defaults (Hugging Face Spaces default: 7860)
 ENV PORT=7860
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
