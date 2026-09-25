@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: sakala-web
+    runtime: docker
+    plan: free
+    region: singapore
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        value: base64:fwehU8LdeWKHK5IBW0exB7ken+3vP6Vs7fNuZSmwkmw=
+      - key: APP_URL
+        value: https://sakala-web.onrender.com
+      - key: SESSION_DRIVER
+        value: file
+      - key: CACHE_STORE
+        value: file
+      - key: LOG_CHANNEL
+        value: stderr
