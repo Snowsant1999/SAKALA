@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends(session('user_role') === 'admin' ? 'layouts.admin' : 'layouts.app')
 
 @section('title', 'Ruangan Belajar')
 @section('page-title', 'Ruangan Belajar')

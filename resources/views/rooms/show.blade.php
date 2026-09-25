@@ -1,9 +1,9 @@
-@extends('layouts.app')
+@extends(session('user_role') === 'admin' ? 'layouts.admin' : 'layouts.app')
 
 @section('title', 'Detail Ruangan - ' . $room['name'])
 @section('page-title')
 <div class="flex items-center gap-3">
-    <a href="{{ url('/rooms') }}" class="text-slate-400 hover:text-slate-600 transition-colors">
+    <a href="{{ session('user_role') === 'admin' ? url('/admin/rooms') : url('/rooms') }}" class="text-slate-400 hover:text-slate-600 transition-colors">
         <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
     </a>
     Ruangan Belajar
@@ -95,12 +95,31 @@
                     </div>
                 @else
                     {{-- Available Slot --}}
-                    <div class="bg-emerald-50/50 rounded-xl p-5 border border-emerald-200 hover:border-emerald-300 hover:shadow-sm transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer" onclick="showToast('Fitur form reservasi akan dikerjakan pada modul berikutnya.')">
+                    @php
+                        $times = explode(' - ', $schedule['time']);
+                        $startTime = trim($times[0] ?? '13:00');
+                        $endTime = trim($times[1] ?? '15:00');
+                        $createUrl = url('/reservations/create') . '?' . http_build_query([
+                            'room_id' => $room['id'],
+                            'room_name' => $room['name'],
+                            'building' => $room['buildingName'],
+                            'floor' => $room['floorLabel'],
+                            'start_time' => $startTime,
+                            'end_time' => $endTime,
+                        ]);
+                    @endphp
+                    <div class="bg-emerald-50/60 rounded-xl p-5 border border-emerald-200 hover:border-emerald-300 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <div class="text-lg font-bold text-slate-800">{{ $schedule['time'] }}</div>
-                            <div class="text-sm font-medium text-emerald-600 mt-1">Kosong (Tersedia)</div>
+                            <div class="text-sm font-medium text-emerald-600 mt-1 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                Kosong (Tersedia untuk Pengajuan)
+                            </div>
                         </div>
-                        <button class="btn btn-success">Ajukan Reservasi</button>
+                        <a href="{{ $createUrl }}" class="btn btn-success">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                            Ajukan Reservasi
+                        </a>
                     </div>
                 @endif
             @empty

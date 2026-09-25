@@ -14,7 +14,7 @@
     <div class="stat-card">
         <div class="stat-icon" style="background: {{ $stat['color'] }}">
             @if($stat['icon'] == 'academic')
-                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a23.838 23.838 0 0 0-1.012 5.434c0 .054.006.108.011.162a48.68 48.68 0 0 1 7.233 3.891A48.68 48.68 0 0 1 12 20.904a48.68 48.68 0 0 1 4.725-3.87 48.68 48.68 0 0 1 7.233-3.891c.005-.054.011-.108.011-.162a23.838 23.838 0 0 0-1.012-5.434m-15.482 0A23.899 23.899 0 0 1 12 2.25a23.899 23.899 0 0 1 7.74 7.897" /></svg>
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10v6M2 10l10-5 10 5-10 5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5" /></svg>
             @elseif($stat['icon'] == 'users')
                 <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
             @elseif($stat['icon'] == 'building')
@@ -83,7 +83,7 @@
                                 <div class="text-xs text-slate-500">{{ $rsv['time'] }}</div>
                             </td>
                             <td class="text-right">
-                                <a href="#" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Detail</a>
+                                <a href="{{ url('/reservations/' . ($rsv['id'] ?? 'rsv-001')) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Detail</a>
                             </td>
                         </tr>
                         @endforeach
@@ -108,6 +108,7 @@
                             <th>Kategori & Tanggal</th>
                             <th>Status</th>
                             <th>Prioritas</th>
+                            <th class="text-right">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -135,6 +136,9 @@
                                 @else
                                     <span class="badge badge-gray text-[10px]">Low</span>
                                 @endif
+                            </td>
+                            <td class="text-right">
+                                <a href="{{ url('/reports/' . $report['id']) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Detail</a>
                             </td>
                         </tr>
                         @endforeach

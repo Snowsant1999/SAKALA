@@ -32,7 +32,7 @@
             <div class="sidebar-section">
                 <div class="sidebar-section-title sidebar-text">Akademik</div>
                 <a href="{{ url('/admin/students') }}" class="sidebar-item {{ request()->is('admin/students*') ? 'active' : '' }}">
-                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a23.838 23.838 0 0 0-1.012 5.434c0 .054.006.108.011.162a48.68 48.68 0 0 1 7.233 3.891A48.68 48.68 0 0 1 12 20.904a48.68 48.68 0 0 1 4.725-3.87 48.68 48.68 0 0 1 7.233-3.891c.005-.054.011-.108.011-.162a23.838 23.838 0 0 0-1.012-5.434m-15.482 0A23.899 23.899 0 0 1 12 2.25a23.899 23.899 0 0 1 7.74 7.897" /></svg>
+                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10v6M2 10l10-5 10 5-10 5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5" /></svg>
                     <span class="sidebar-text">Mahasiswa</span>
                 </a>
                 <a href="{{ url('/admin/lecturers') }}" class="sidebar-item {{ request()->is('admin/lecturers*') ? 'active' : '' }}">
