@@ -7,6 +7,9 @@ use App\Http\Controllers\RoomController;
 use App\Http\Controllers\CourseController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\AspirationController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminMasterController;
 
 // Auth Routes
@@ -14,8 +17,7 @@ Route::get('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/login', [AuthController::class, 'authenticate']);
 Route::post('/logout', [AuthController::class, 'logout']);
 
-// Protected Routes (using MockAuth middleware)
-Route::middleware([\App\Http\Middleware\MockAuth::class])->group(function () {
+Route::middleware(['auth'])->group(function () {
     
     // Redirect root to dashboard
     Route::get('/', function () {
@@ -53,6 +55,22 @@ Route::middleware([\App\Http\Middleware\MockAuth::class])->group(function () {
     Route::post('/reports', [ReportController::class, 'store']);
     Route::get('/reports/{id}', [ReportController::class, 'show']);
 
+    // Layanan Aspirasi Module (Separated from Kampus Aman)
+    Route::get('/aspirations', [AspirationController::class, 'index']);
+    Route::get('/aspirations/create', [AspirationController::class, 'create']);
+    Route::post('/aspirations', [AspirationController::class, 'store']);
+    Route::get('/aspirations/{id}', [AspirationController::class, 'show']);
+
+    // Notifications Module
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // User Profile Module
+    Route::get('/profile', [ProfileController::class, 'index']);
+    Route::post('/profile', [ProfileController::class, 'update']);
+    Route::post('/profile/password', [ProfileController::class, 'updatePassword']);
+
     // Admin Routes
     Route::prefix('admin')->group(function () {
         // Admin Reservations & Conflicts
@@ -60,9 +78,13 @@ Route::middleware([\App\Http\Middleware\MockAuth::class])->group(function () {
         Route::post('/reservations/{id}/approve', [ReservationController::class, 'adminApprove']);
         Route::post('/reservations/{id}/reject', [ReservationController::class, 'adminReject']);
 
-        // Admin Reports
+        // Admin Reports (Kampus Aman)
         Route::get('/reports', [ReportController::class, 'adminIndex']);
         Route::post('/reports/{id}/update', [ReportController::class, 'adminUpdate']);
+
+        // Admin Aspirations (Layanan Sarpras & Aspirasi)
+        Route::get('/aspirations', [AspirationController::class, 'adminIndex']);
+        Route::post('/aspirations/{id}/update', [AspirationController::class, 'adminUpdate']);
 
         // Admin Master Data
         Route::get('/users', [AdminMasterController::class, 'users']);

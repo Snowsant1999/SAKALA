@@ -58,6 +58,7 @@
             <a href="{{ url('/rooms/'.$room['id']) }}" class="room-card group">
                 <div class="flex justify-between items-start mb-3">
                     <span class="text-xs font-semibold text-slate-400">{{ $room['code'] }}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/60">Lantai {{ $room['floorId'] }}</span>
                 </div>
                 <h3 class="room-name group-hover:text-navy-700">{{ $room['name'] }}</h3>
                 <p class="room-capacity flex items-center gap-1.5">

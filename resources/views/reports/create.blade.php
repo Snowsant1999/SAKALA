@@ -33,8 +33,10 @@
                         <option value="Pelecehan Verbal">Pelecehan Verbal</option>
                         <option value="Pelecehan Non-Verbal">Pelecehan Non-Verbal / Fisik</option>
                         <option value="Kekerasan">Tindakan Kekerasan</option>
-                        <option value="Lainnya">Lainnya / Pelanggaran Etika</option>
+                        <option value="Pelanggaran Etika">Pelanggaran Etika & Kode Etik</option>
+                        <option value="Lainnya">Lainnya (Isu Keamanan & Kesejahteraan Mahasiswa)</option>
                     </select>
+                    <p class="text-[11px] text-slate-400 mt-1">Untuk keluhan AC, proyektor, atau sarana belajar, gunakan menu <a href="{{ url('/aspirations/create') }}" class="text-navy-600 font-semibold underline">Layanan Aspirasi & Fasilitas</a>.</p>
                 </div>
 
                 <div class="form-group">
