@@ -20,7 +20,7 @@
 
     {{-- Report Form Card --}}
     <div class="card p-8">
-        <form action="{{ url('/reports') }}" method="POST" class="space-y-6">
+        <form action="{{ url('/reports') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
             @csrf
 
             {{-- Category & Date --}}
@@ -64,11 +64,12 @@
                 <textarea name="description" id="description" rows="5" class="form-input" placeholder="Ceritakan apa yang terjadi, kapan, bagaimana situasi kejadian, dan dampak yang Anda rasakan secara jelas..." required></textarea>
             </div>
 
-            {{-- Mock Attachment Upload --}}
+            {{-- Private evidence upload --}}
             <div class="form-group">
-                <label class="form-label">Bukti Pendukung / Lampiran (Mock Upload)</label>
-                <input type="text" name="attachments" class="form-input" placeholder="Nama berkas bukti (mis. bukti_chat.png / rekaman.mp3)" value="bukti_lampiran_insiden_{{ date('dmY') }}.pdf">
-                <p class="text-[11px] text-slate-400 mt-1">Simulasi upload dokumen bukti (tangkapan layar chat, foto, rekaman suara, atau dokumen pendukung).</p>
+                <label class="form-label" for="attachment">Bukti Pendukung / Lampiran (Opsional)</label>
+                <input type="file" name="attachment" id="attachment" class="form-input" accept=".pdf,.jpg,.jpeg,.png,.mp3,.mp4">
+                @error('attachment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                <p class="text-[11px] text-slate-400 mt-1">File disimpan secara privat dan hanya dapat diakses oleh pelapor atau admin berwenang.</p>
             </div>
 
             {{-- Security Notice --}}

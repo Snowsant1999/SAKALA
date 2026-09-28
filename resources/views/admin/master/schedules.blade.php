@@ -9,34 +9,35 @@
     <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-sm font-bold text-slate-800">Jadwal Perkuliahan</h2>
-            <p class="text-xs text-slate-500 mt-1">Semester Ganjil 2026/2027 — Politeknik Negeri Samarinda</p>
+            <p class="text-xs text-slate-500 mt-1">Jadwal tersimpan untuk seluruh kelas</p>
         </div>
         <div class="flex items-center gap-2">
             <select class="form-input text-xs" id="dayFilter">
                 <option value="">Semua Hari</option>
-                <option>Senin</option>
-                <option>Selasa</option>
-                <option>Rabu</option>
-                <option>Kamis</option>
-                <option>Jumat</option>
+                @foreach($days as $day)
+                    <option value="{{ $day }}">{{ $day }}</option>
+                @endforeach
             </select>
             <select class="form-input text-xs" id="programFilter">
                 <option value="">Semua Prodi</option>
-                <option>TIM</option>
-                <option>TRK</option>
+                @foreach($programs as $program)
+                    <option value="{{ $program }}">{{ $program }}</option>
+                @endforeach
             </select>
+            <a href="{{ url('/admin/schedules/create') }}" class="btn btn-primary text-xs">Tambah Jadwal</a>
         </div>
     </div>
 
     {{-- Schedule Timeline --}}
     @php
-        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
         $dayColors = [
             'Senin' => ['bg' => '#eef2ff', 'border' => '#6366f1', 'text' => '#4338ca'],
             'Selasa' => ['bg' => '#ecfdf5', 'border' => '#10b981', 'text' => '#059669'],
             'Rabu' => ['bg' => '#fef3c7', 'border' => '#f59e0b', 'text' => '#d97706'],
             'Kamis' => ['bg' => '#fce7f3', 'border' => '#ec4899', 'text' => '#db2777'],
             'Jumat' => ['bg' => '#f0f9ff', 'border' => '#0ea5e9', 'text' => '#0369a1'],
+            'Sabtu' => ['bg' => '#f0fdf4', 'border' => '#22c55e', 'text' => '#15803d'],
+            'Minggu' => ['bg' => '#f8fafc', 'border' => '#64748b', 'text' => '#334155'],
         ];
     @endphp
 
@@ -57,7 +58,7 @@
                 {{-- Schedule Items --}}
                 <div class="divide-y divide-slate-100">
                     @foreach($daySchedules as $s)
-                        <div class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-slate-50 transition-colors">
+                        <div data-schedule-entry data-day="{{ $day }}" data-program="{{ $s['program'] }}" class="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-slate-50 transition-colors">
                             {{-- Time --}}
                             <div class="flex items-center gap-2 sm:w-36 shrink-0">
                                 <div class="w-2.5 h-2.5 rounded-full" style="background: {{ $dayColors[$day]['border'] }};"></div>
@@ -89,6 +90,15 @@
                             <div class="sm:w-16 shrink-0 text-xs font-semibold text-slate-600">
                                 {{ $s['class'] ?? '-' }}
                             </div>
+                            <span class="badge text-[10px]">{{ $s['mode'] }}</span>
+                            <div class="flex items-center gap-2">
+                                <a href="{{ url('/admin/schedules/'.$s['id'].'/edit') }}" class="text-xs font-semibold text-indigo-600">Edit</a>
+                                <form method="POST" action="{{ url('/admin/schedules/'.$s['id']) }}" onsubmit="return confirm('Hapus jadwal ini?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-xs font-semibold text-red-600">Hapus</button>
+                                </form>
+                            </div>
                         </div>
                     @endforeach
                 </div>
@@ -96,4 +106,25 @@
         @endif
     @endforeach
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    const dayFilter = document.getElementById('dayFilter');
+    const programFilter = document.getElementById('programFilter');
+    const scheduleEntries = document.querySelectorAll('[data-schedule-entry]');
+
+    function filterSchedules() {
+        const day = dayFilter.value;
+        const program = programFilter.value;
+
+        scheduleEntries.forEach((entry) => {
+            entry.hidden = (day && entry.dataset.day !== day)
+                || (program && entry.dataset.program !== program);
+        });
+    }
+
+    dayFilter.addEventListener('change', filterSchedules);
+    programFilter.addEventListener('change', filterSchedules);
+</script>
 @endsection

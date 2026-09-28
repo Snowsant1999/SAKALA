@@ -8,10 +8,10 @@
     {{-- Header & Toolbar --}}
     <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="text-xs text-slate-500 font-medium">Politeknik Negeri Samarinda — Daftar Program Studi</div>
-        <button onclick="showToast('Fitur tambah program studi baru', 'info')" class="btn btn-primary text-xs">
+        <a href="{{ url('/admin/study-programs/create') }}" class="btn btn-primary text-xs">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Tambah Program Studi
-        </button>
+        </a>
     </div>
 
     {{-- Study Programs Table --}}
@@ -39,7 +39,14 @@
                                 <span class="badge badge-success text-[10px]">{{ $p['accreditation'] }}</span>
                             </td>
                             <td class="text-right">
-                                <button onclick="showToast('Edit prodi {{ $p['name'] }}', 'info')" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</button>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ url('/admin/study-programs/'.$p['id'].'/edit') }}" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/study-programs/'.$p['id']) }}" onsubmit="return confirm('Hapus program studi ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @endforeach

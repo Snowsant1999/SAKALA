@@ -114,7 +114,7 @@
                     <tbody>
                         @foreach($recentReports as $report)
                         <tr>
-                            <td class="font-medium text-slate-600 text-xs">#{{ explode('-', $report['id'])[1] }}</td>
+                            <td class="font-medium text-slate-600 text-xs">#{{ $report['id'] }}</td>
                             <td>
                                 <div class="font-medium text-slate-800">{{ $report['category'] }}</div>
                                 <div class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($report['date'])->translatedFormat('d F Y') }}</div>

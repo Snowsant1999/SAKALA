@@ -8,7 +8,7 @@
     {{-- Header & Toolbar --}}
     <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="relative w-full sm:w-72">
-            <input type="text" placeholder="Cari user..." class="form-input text-xs pl-9">
+            <input type="text" id="userSearch" placeholder="Cari user..." class="form-input text-xs pl-9">
             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
         </div>
         <div class="flex items-center gap-2">
@@ -18,6 +18,7 @@
                 <option value="dosen">Dosen</option>
                 <option value="admin">Admin</option>
             </select>
+            <a href="{{ url('/admin/users/create') }}" class="btn btn-primary text-xs">Tambah User</a>
         </div>
     </div>
 
@@ -37,7 +38,7 @@
                 </thead>
                 <tbody>
                     @foreach($students as $s)
-                        <tr>
+                        <tr data-user-row data-role="mahasiswa">
                             <td>
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">{{ strtoupper(substr($s['name'], 0, 1)) }}</div>
@@ -53,13 +54,18 @@
                             <td><span class="badge {{ $s['status'] === 'Aktif' ? 'badge-success' : 'badge-warning' }} text-[10px]">{{ $s['status'] }}</span></td>
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button onclick="showToast('Edit user {{ $s['name'] }}', 'info')" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</button>
+                                    <a href="{{ url('/admin/users/'.$s['id'].'/edit') }}" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/users/'.$s['id']) }}" onsubmit="return confirm('Hapus user ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
                     @endforeach
                     @foreach($lecturers as $l)
-                        <tr>
+                        <tr data-user-row data-role="dosen">
                             <td>
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #059669, #10b981);">{{ strtoupper(substr($l['name'], 0, 1)) }}</div>
@@ -75,7 +81,36 @@
                             <td><span class="badge badge-success text-[10px]">Aktif</span></td>
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button onclick="showToast('Edit user {{ $l['name'] }}', 'info')" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</button>
+                                    <a href="{{ url('/admin/users/'.$l['id'].'/edit') }}" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/users/'.$l['id']) }}" onsubmit="return confirm('Hapus user ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                    @foreach($admins as $admin)
+                        <tr data-user-row data-role="admin">
+                            <td>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-navy-700">{{ strtoupper(substr($admin['name'], 0, 1)) }}</div>
+                                    <div class="font-bold text-xs text-slate-800">{{ $admin['name'] }}</div>
+                                </div>
+                            </td>
+                            <td class="text-xs text-slate-500">{{ $admin['email'] }}</td>
+                            <td><span class="badge text-[10px] bg-slate-100 text-slate-700">Admin</span></td>
+                            <td class="text-xs text-slate-500">—</td>
+                            <td><span class="badge {{ $admin['status'] === 'Aktif' ? 'badge-success' : 'badge-warning' }} text-[10px]">{{ $admin['status'] }}</span></td>
+                            <td class="text-right">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ url('/admin/users/'.$admin['id'].'/edit') }}" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/users/'.$admin['id']) }}" onsubmit="return confirm('Hapus user ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -85,4 +120,26 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    const userSearch = document.getElementById('userSearch');
+    const roleFilter = document.getElementById('roleFilter');
+    const userRows = document.querySelectorAll('[data-user-row]');
+
+    function filterUsers() {
+        const query = userSearch.value.trim().toLocaleLowerCase();
+        const role = roleFilter.value;
+
+        userRows.forEach((row) => {
+            const matchesRole = !role || row.dataset.role === role;
+            const matchesQuery = row.textContent.toLocaleLowerCase().includes(query);
+            row.hidden = !(matchesRole && matchesQuery);
+        });
+    }
+
+    userSearch.addEventListener('input', filterUsers);
+    roleFilter.addEventListener('change', filterUsers);
+</script>
 @endsection

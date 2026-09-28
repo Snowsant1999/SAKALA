@@ -57,7 +57,7 @@ class DashboardController extends Controller
             ['label' => 'Aspirasi Masuk', 'value' => $aspirasiBaru, 'icon' => 'chat', 'color' => '#8b5cf6'],
         ];
 
-        $pendingReservations = Reservation::with(['user', 'room.building'])
+        $pendingReservations = Reservation::with(['user.studyProgram', 'room.building'])
             ->where('status', 'pending')
             ->latest()
             ->take(5)
@@ -67,6 +67,7 @@ class DashboardController extends Controller
                     'id' => $rsv->id,
                     'requester' => $rsv->user?->name ?? 'Anonim',
                     'role' => ucfirst($rsv->user?->role ?? 'Mahasiswa'),
+                    'class' => $rsv->user?->studyProgram?->name ?? 'Umum',
                     'room' => ($rsv->room?->name ?? 'Ruangan') . ' (' . ($rsv->room?->code ?? '') . ')',
                     'date' => Carbon::parse($rsv->date)->format('Y-m-d'),
                     'time' => substr($rsv->start_time, 0, 5) . ' - ' . substr($rsv->end_time, 0, 5),

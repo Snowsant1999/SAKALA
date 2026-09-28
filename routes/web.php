@@ -11,6 +11,7 @@ use App\Http\Controllers\AspirationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminMasterController;
+use App\Http\Controllers\AdminMasterDataController;
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'login'])->name('login');
@@ -26,7 +27,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
-    Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard']);
+    Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])->middleware('admin');
 
     // Academic Module
     Route::get('/courses', [CourseController::class, 'index']);
@@ -53,6 +54,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/reports', [ReportController::class, 'index']);
     Route::get('/reports/create', [ReportController::class, 'create']);
     Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports/{id}/attachment', [ReportController::class, 'downloadAttachment']);
     Route::get('/reports/{id}', [ReportController::class, 'show']);
 
     // Layanan Aspirasi Module (Separated from Kampus Aman)
@@ -72,7 +74,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/profile/password', [ProfileController::class, 'updatePassword']);
 
     // Admin Routes
-    Route::prefix('admin')->group(function () {
+    Route::prefix('admin')->middleware('admin')->group(function () {
         // Admin Reservations & Conflicts
         Route::get('/reservations', [ReservationController::class, 'adminIndex']);
         Route::post('/reservations/{id}/approve', [ReservationController::class, 'adminApprove']);
@@ -95,7 +97,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/courses', [AdminMasterController::class, 'courses']);
         Route::get('/classes', [AdminMasterController::class, 'classes']);
         Route::get('/buildings', [AdminMasterController::class, 'buildings']);
+        Route::get('/floors', [AdminMasterController::class, 'floors']);
         Route::get('/rooms', [AdminMasterController::class, 'rooms']);
         Route::get('/schedules', [AdminMasterController::class, 'schedules']);
+
+        $masterResources = 'users|students|lecturers|departments|study-programs|courses|classes|buildings|floors|rooms|schedules';
+        Route::get('/{resource}/create', [AdminMasterDataController::class, 'create'])->where('resource', $masterResources);
+        Route::post('/{resource}', [AdminMasterDataController::class, 'store'])->where('resource', $masterResources);
+        Route::get('/{resource}/{id}/edit', [AdminMasterDataController::class, 'edit'])->where(['resource' => $masterResources, 'id' => '[0-9]+']);
+        Route::put('/{resource}/{id}', [AdminMasterDataController::class, 'update'])->where(['resource' => $masterResources, 'id' => '[0-9]+']);
+        Route::delete('/{resource}/{id}', [AdminMasterDataController::class, 'destroy'])->where(['resource' => $masterResources, 'id' => '[0-9]+']);
     });
 });

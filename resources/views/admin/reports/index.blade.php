@@ -138,6 +138,8 @@
                                     <span class="badge badge-info text-[10px]">IN PROGRESS</span>
                                 @elseif($r['status'] === 'UNDER_REVIEW')
                                     <span class="badge badge-warning text-[10px]">UNDER REVIEW</span>
+                                @elseif($r['status'] === 'REJECTED')
+                                    <span class="badge badge-danger text-[10px]">REJECTED</span>
                                 @else
                                     <span class="badge bg-purple-50 text-purple-700 text-[10px]">SUBMITTED</span>
                                 @endif
@@ -182,6 +184,7 @@
                     <option value="UNDER_REVIEW">UNDER_REVIEW (Sedang Ditelaah)</option>
                     <option value="IN_PROGRESS">IN_PROGRESS (Dalam Proses Investigasi/Mediasi)</option>
                     <option value="RESOLVED">RESOLVED (Kasus Selesai Ditangani)</option>
+                    <option value="REJECTED">REJECTED (Diarsipkan)</option>
                 </select>
             </div>
 

@@ -61,6 +61,12 @@
             <a href="{{ url('/admin/reservations?tab=approved') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'approved') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
                 Disetujui ({{ $approvedCount }})
             </a>
+            <a href="{{ url('/admin/reservations?tab=today') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'today') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
+                Hari Ini ({{ $todayCount }})
+            </a>
+            <a href="{{ url('/admin/reservations?tab=upcoming') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'upcoming') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
+                Mendatang ({{ $upcomingCount }})
+            </a>
             <a href="{{ url('/admin/reservations?tab=rejected') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'rejected') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
                 Ditolak ({{ $rejectedCount }})
             </a>
@@ -94,22 +100,22 @@
             </div>
 
             @forelse($conflicts as $group)
-                @php $first = $group[0]; @endphp
+                @php $requests = $group['requests'] ?? []; $first = $requests[0] ?? []; @endphp
                 <div class="card overflow-hidden border-2 border-red-200">
                     <div class="bg-red-50/80 px-6 py-4 border-b border-red-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div class="flex items-center gap-3">
                             <span class="badge badge-danger text-xs font-bold uppercase">Konflik Terdeteksi</span>
-                            <span class="font-bold text-slate-800 text-sm">{{ $first['room_name'] }}</span>
-                            <span class="text-xs text-slate-500">• {{ \Carbon\Carbon::parse($first['date'])->translatedFormat('d F Y') }} ({{ $first['time_formatted'] }} WITA)</span>
+                            <span class="font-bold text-slate-800 text-sm">{{ $group['room_name'] }}</span>
+                            <span class="text-xs text-slate-500">• {{ \Carbon\Carbon::parse($group['date'])->translatedFormat('d F Y') }} ({{ $first['time_formatted'] ?? '' }} WITA)</span>
                         </div>
                         <span class="text-xs font-semibold text-red-700 bg-white px-2.5 py-1 rounded-full border border-red-200">
-                            {{ count($group) }} Pengajuan Bentrok
+                            {{ count($requests) }} Pengajuan Bentrok
                         </span>
                     </div>
 
                     {{-- Side by Side Comparison Grid --}}
                     <div class="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-slate-50/50">
-                        @foreach($group as $index => $r)
+                        @foreach($requests as $index => $r)
                             <div class="card p-5 bg-white border border-slate-200 hover:border-navy-400 hover:shadow-md transition-all flex flex-col justify-between">
                                 <div class="space-y-3">
                                     <div class="flex items-center justify-between">
@@ -134,11 +140,11 @@
 
                                 {{-- Decision Actions for this Option --}}
                                 <div class="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-                                    <a href="{{ url('/reservations/' . $r['id']) }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">Detail Lengkap</a>
+                                    <a href="{{ url('/reservations/' . $r['raw_id']) }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">Detail Lengkap</a>
                                     
                                     <div class="flex items-center gap-2">
                                         {{-- Reject Button --}}
-                                        <form action="{{ url('/admin/reservations/' . $r['id'] . '/reject') }}" method="POST">
+                                        <form action="{{ url('/admin/reservations/' . $r['raw_id'] . '/reject') }}" method="POST">
                                             @csrf
                                             <button type="submit" class="btn btn-secondary text-xs text-red-600 hover:bg-red-50 border-red-200">
                                                 Tolak Opsi Ini
@@ -146,7 +152,7 @@
                                         </form>
 
                                         {{-- Approve Button (Triggers auto conflict resolution) --}}
-                                        <form action="{{ url('/admin/reservations/' . $r['id'] . '/approve') }}" method="POST">
+                                        <form action="{{ url('/admin/reservations/' . $r['raw_id'] . '/approve') }}" method="POST">
                                             @csrf
                                             <input type="hidden" name="admin_note" value="Disetujui untuk {{ $r['requester_name'] }} ({{ $r['class'] }}). Slot waktu resmi dikunci.">
                                             <button type="submit" class="btn btn-success text-xs font-bold shadow-md">

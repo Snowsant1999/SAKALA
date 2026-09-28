@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Report extends Model
 {
@@ -12,8 +14,13 @@ class Report extends Model
         'incident_date' => 'date',
     ];
 
-    public function reporter()
+    public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reporter_id');
+    }
+
+    public function statusHistories(): HasMany
+    {
+        return $this->hasMany(ReportStatusHistory::class)->latest();
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Material;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
 use App\Models\Schedule;
+use App\Models\User;
 use Carbon\Carbon;
 
 class CourseController extends Controller

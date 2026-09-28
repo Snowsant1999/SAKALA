@@ -6,17 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Course extends Model
+class Floor extends Model
 {
     protected $guarded = ['id'];
 
-    public function studyProgram(): BelongsTo
+    public function building(): BelongsTo
     {
-        return $this->belongsTo(StudyProgram::class);
+        return $this->belongsTo(Building::class);
     }
 
-    public function classes(): HasMany
+    public function rooms(): HasMany
     {
-        return $this->hasMany(CourseClass::class);
+        return $this->hasMany(Room::class);
     }
 }

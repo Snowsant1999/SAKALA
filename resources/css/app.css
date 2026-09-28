@@ -551,8 +551,22 @@ body {
    ======================================== */
 
 .login-bg {
-    background: radial-gradient(circle at 50% 30%, #1e2d6b 0%, #0c1229 70%, #060914 100%);
+    /* background: radial-gradient(circle at 50% 30%, #1e2d6b 0%, #0c1229 70%, #060914 100%); */
+    position: relative;
+    isolation: isolate;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     min-height: 100vh;
+}
+
+.login-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-color: rgba(128, 128, 128, 0.25);
+    pointer-events: none;
 }
 
 .login-card {

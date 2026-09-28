@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\Auth;
 use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\Course;
+use App\Models\CourseClass;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ReservationController extends Controller
 {
@@ -22,7 +26,7 @@ class ReservationController extends Controller
             'room_id' => $r->room_id,
             'room_name' => ($r->room?->name ?? 'Ruangan') . ' (' . ($r->room?->code ?? '') . ')',
             'building' => $r->room?->building?->name ?? 'Gedung TI',
-            'floor' => 'Lantai 1',
+            'floor' => $r->room?->floorRecord?->label ?? ('Lantai '.$r->room?->floor),
             'date' => Carbon::parse($r->date)->format('Y-m-d'),
             'time_formatted' => substr($r->start_time, 0, 5) . ' - ' . substr($r->end_time, 0, 5),
             'start_time' => substr($r->start_time, 0, 5),
@@ -31,10 +35,11 @@ class ReservationController extends Controller
             'requester_email' => $r->user?->email ?? '',
             'requester_role' => ucfirst($r->user?->role ?? 'Mahasiswa'),
             'requester_nim' => $r->user?->nim_nip ?? '—',
-            'study_program' => $r->user?->studyProgram?->name ?? 'Teknik Informatika (S1)',
-            'class' => 'TIM 5A',
-            'course' => 'Kegiatan Akademik & Diskusi',
+            'study_program' => $r->user?->studyProgram?->name ?? $r->course?->studyProgram?->name ?? 'Belum ditentukan',
+            'class' => $r->courseClass?->name ?? 'Belum ditetapkan',
+            'course' => $r->course?->name ?? $r->courseClass?->course?->name ?? 'Kegiatan umum',
             'purpose' => $r->purpose,
+            'notes' => $r->notes,
             'status' => strtoupper($r->status),
             'admin_note' => $r->admin_notes,
             'created_at' => Carbon::parse($r->created_at)->translatedFormat('d M Y, H:i'),
@@ -74,14 +79,15 @@ class ReservationController extends Controller
      */
     public function create(Request $request)
     {
-        $roomId = $request->query('room_id');
-        $room = $roomId ? Room::with('building')->find($roomId) : Room::with('building')->first();
+        $roomId = $request->integer('room_id') ?: null;
+        $room = $roomId ? Room::with(['building', 'floorRecord'])->find($roomId) : null;
+        $rooms = Room::with(['building', 'floorRecord'])->orderBy('name')->get();
 
         $date = $request->query('date', Carbon::tomorrow()->format('Y-m-d'));
         $startTime = $request->query('start_time', '13:00');
         $endTime = $request->query('end_time', '15:00');
 
-        $courses = Course::all()->map(function ($c) {
+        $courses = Course::orderBy('name')->get()->map(function ($c) {
             return [
                 'id' => $c->id,
                 'code' => $c->code,
@@ -89,7 +95,14 @@ class ReservationController extends Controller
             ];
         })->toArray();
 
-        return view('reservations.create', compact('room', 'roomId', 'date', 'startTime', 'endTime', 'courses'));
+        $classes = CourseClass::with('course')->orderBy('name')->get()->map(fn (CourseClass $class): array => [
+            'id' => $class->id,
+            'name' => $class->name,
+            'course_id' => $class->course_id,
+            'course' => $class->course?->name ?? 'Mata Kuliah',
+        ])->all();
+
+        return view('reservations.create', compact('room', 'roomId', 'rooms', 'date', 'startTime', 'endTime', 'courses', 'classes'));
     }
 
     /**
@@ -97,33 +110,52 @@ class ReservationController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'date' => 'required|date',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'purpose' => 'required|string',
+        $user = Auth::user();
+        $data = $request->validate([
+            'room_id' => ['required', 'integer', 'exists:rooms,id'],
+            'course_id' => ['nullable', 'integer', 'exists:courses,id'],
+            'course_class_id' => ['nullable', 'integer', 'exists:course_classes,id'],
+            'date' => ['required', 'date', 'after_or_equal:today'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'purpose' => ['required', 'string', 'max:5000'],
+            'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $user = Auth::user();
-        $roomId = $request->input('room_id');
-        if (!$roomId || !Room::find($roomId)) {
-            $firstRoom = Room::first();
-            $roomId = $firstRoom?->id ?? 1;
+        $courseClass = isset($data['course_class_id']) ? CourseClass::findOrFail($data['course_class_id']) : null;
+        if ($courseClass && isset($data['course_id']) && $courseClass->course_id !== (int) $data['course_id']) {
+            throw ValidationException::withMessages(['course_class_id' => 'Kelas tidak terdaftar pada mata kuliah yang dipilih.']);
+        }
+        if ($courseClass && !isset($data['course_id'])) {
+            $data['course_id'] = $courseClass->course_id;
+        }
+
+        $approvedConflict = Reservation::where('room_id', $data['room_id'])
+            ->where('date', $data['date'])
+            ->where('status', 'approved')
+            ->where('start_time', '<', $data['end_time'])
+            ->where('end_time', '>', $data['start_time'])
+            ->exists();
+        if ($approvedConflict) {
+            throw ValidationException::withMessages(['room_id' => 'Ruangan sudah memiliki reservasi yang disetujui pada rentang waktu tersebut.']);
         }
 
         $reservation = Reservation::create([
             'user_id' => $user->id,
-            'room_id' => $roomId,
-            'date' => $request->input('date'),
-            'start_time' => $request->input('start_time'),
-            'end_time' => $request->input('end_time'),
-            'purpose' => $request->input('purpose'),
+            'room_id' => $data['room_id'],
+            'course_id' => $data['course_id'] ?? null,
+            'course_class_id' => $data['course_class_id'] ?? null,
+            'date' => $data['date'],
+            'start_time' => $data['start_time'],
+            'end_time' => $data['end_time'],
+            'purpose' => $data['purpose'],
+            'notes' => $data['notes'] ?? null,
             'status' => 'pending',
         ]);
 
         // Notify admins about the new reservation request
         $admins = User::where('role', 'admin')->get();
-        $room = Room::find($roomId);
+        $room = Room::find($data['room_id']);
         foreach ($admins as $admin) {
             NotificationController::createNotification(
                 $admin->id,
@@ -144,7 +176,12 @@ class ReservationController extends Controller
     {
         // Accept either numeric id or RSV-0001 format
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
-        $reservationModel = Reservation::with(['user.studyProgram', 'room.building'])->findOrFail($numericId);
+        $reservationModel = Reservation::with(['user.studyProgram', 'room.building', 'room.floor', 'course.studyProgram', 'courseClass.course.studyProgram'])->findOrFail($numericId);
+        $user = Auth::user();
+        if ($user->role !== 'admin' && (int) $reservationModel->user_id !== (int) $user->id) {
+            abort(403, 'Anda tidak memiliki izin untuk melihat reservasi ini.');
+        }
+
         $reservation = $this->formatReservation($reservationModel);
 
         return view('reservations.show', compact('reservation'));
@@ -156,7 +193,13 @@ class ReservationController extends Controller
     public function adminIndex(Request $request)
     {
         $activeTab = $request->query('tab', 'pending');
-        $allModels = Reservation::with(['user.studyProgram', 'room.building'])->latest()->get();
+        $allModels = Reservation::with([
+            'user.studyProgram',
+            'room.building',
+            'room.floor',
+            'course.studyProgram',
+            'courseClass.course.studyProgram',
+        ])->latest()->get();
 
         $all = $allModels->map(fn($r) => $this->formatReservation($r))->toArray();
 
@@ -164,33 +207,51 @@ class ReservationController extends Controller
             $reservations = [];
         } elseif ($activeTab === 'all') {
             $reservations = $all;
+        } elseif ($activeTab === 'today') {
+            $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['date'] === now()->format('Y-m-d')));
+        } elseif ($activeTab === 'upcoming') {
+            $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['date'] > now()->format('Y-m-d')));
         } else {
             $reservations = array_values(array_filter($all, fn($r) => strtolower($r['status']) === strtolower($activeTab)));
         }
 
-        // Detect conflicts among pending & approved reservations
         $conflicts = [];
-        $activeRes = $allModels->whereIn('status', ['pending', 'approved']);
-        foreach ($activeRes as $r1) {
-            foreach ($activeRes as $r2) {
-                if ($r1->id < $r2->id && $r1->room_id === $r2->room_id && $r1->date->format('Y-m-d') === $r2->date->format('Y-m-d')) {
-                    if ($r1->start_time < $r2->end_time && $r1->end_time > $r2->start_time) {
-                        $conflicts[] = [
-                            'room_name' => $r1->room?->name ?? 'Ruangan',
-                            'date' => $r1->date->format('Y-m-d'),
-                            'requests' => [
-                                $this->formatReservation($r1),
-                                $this->formatReservation($r2),
-                            ],
-                        ];
+        $activeReservations = $allModels
+            ->whereIn('status', ['pending', 'approved'])
+            ->groupBy(fn (Reservation $reservation): string => $reservation->room_id.'|'.$reservation->date->format('Y-m-d'));
+
+        foreach ($activeReservations as $group) {
+            $ordered = $group->sortBy('start_time')->values();
+            $overlapGroup = [];
+            $groupEnd = null;
+
+            foreach ($ordered as $reservation) {
+                if ($overlapGroup === [] || $reservation->start_time < $groupEnd) {
+                    $overlapGroup[] = $reservation;
+                    if ($groupEnd === null || $reservation->end_time > $groupEnd) {
+                        $groupEnd = $reservation->end_time;
                     }
+                    continue;
                 }
+
+                if (count($overlapGroup) > 1) {
+                    $conflicts[] = $this->formatConflictGroup($overlapGroup);
+                }
+
+                $overlapGroup = [$reservation];
+                $groupEnd = $reservation->end_time;
+            }
+
+            if (count($overlapGroup) > 1) {
+                $conflicts[] = $this->formatConflictGroup($overlapGroup);
             }
         }
 
         $pendingCount = $allModels->where('status', 'pending')->count();
         $approvedCount = $allModels->where('status', 'approved')->count();
         $rejectedCount = $allModels->where('status', 'rejected')->count();
+        $todayCount = $allModels->where('date', today())->count();
+        $upcomingCount = $allModels->filter(fn (Reservation $reservation): bool => $reservation->date->isAfter(today()))->count();
         $conflictCount = count($conflicts);
 
         return view('admin.reservations.index', compact(
@@ -200,8 +261,21 @@ class ReservationController extends Controller
             'pendingCount', 
             'approvedCount', 
             'rejectedCount', 
-            'conflictCount'
+            'conflictCount',
+            'todayCount',
+            'upcomingCount'
         ));
+    }
+
+    private function formatConflictGroup(array $reservations): array
+    {
+        $first = $reservations[0];
+
+        return [
+            'room_name' => $first->room?->name ?? 'Ruangan',
+            'date' => $first->date->format('Y-m-d'),
+            'requests' => array_map(fn (Reservation $reservation): array => $this->formatReservation($reservation), $reservations),
+        ];
     }
 
     /**
@@ -210,48 +284,79 @@ class ReservationController extends Controller
     public function adminApprove(Request $request, $id)
     {
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
-        $reservation = Reservation::findOrFail($numericId);
-
-        $adminNote = $request->input('admin_note', 'Disetujui oleh Admin Akademik SAKALA.');
-        $reservation->update([
-            'status' => 'approved',
-            'admin_notes' => $adminNote,
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        // Trigger notification for the applicant
-        NotificationController::createNotification(
-            $reservation->user_id,
-            'Reservasi Disetujui',
-            "Pengajuan peminjaman " . ($reservation->room?->name ?? 'ruangan') . " pada " . $reservation->date->format('d/m/Y') . " telah disetujui admin.",
-            'reservation_approved',
-            '/reservations/' . $reservation->id
-        );
+        $failure = DB::transaction(function () use ($numericId, $validated): ?string {
+            $reservation = Reservation::query()->whereKey($numericId)->lockForUpdate()->firstOrFail();
+            if ($reservation->status !== 'pending') {
+                return 'Hanya reservasi yang masih menunggu yang dapat disetujui.';
+            }
 
-        // Automatically reject conflicting pending requests for the same room and date
-        $conflicting = Reservation::where('id', '!=', $reservation->id)
-            ->where('room_id', $reservation->room_id)
-            ->where('date', $reservation->date)
-            ->where('status', 'pending')
-            ->where('start_time', '<', $reservation->end_time)
-            ->where('end_time', '>', $reservation->start_time)
-            ->get();
+            $approvedOverlap = Reservation::query()
+                ->where('room_id', $reservation->room_id)
+                ->where('date', $reservation->date)
+                ->where('status', 'approved')
+                ->where('start_time', '<', $reservation->end_time)
+                ->where('end_time', '>', $reservation->start_time)
+                ->lockForUpdate()
+                ->exists();
 
-        foreach ($conflicting as $c) {
-            $c->update([
-                'status' => 'rejected',
-                'admin_notes' => 'Otomatis ditolak: Bentrok dengan reservasi ' . ('RSV-' . str_pad($reservation->id, 4, '0', STR_PAD_LEFT)) . ' yang telah disetujui.',
+            if ($approvedOverlap) {
+                return 'Tidak dapat menyetujui reservasi karena slot waktu sudah dikunci oleh reservasi lain.';
+            }
+
+            $adminNote = $validated['admin_note'] ?? 'Disetujui oleh Admin Akademik SAKALA.';
+            $reservation->update([
+                'status' => 'approved',
+                'admin_notes' => $adminNote,
+                'reviewed_by' => Auth::id(),
             ]);
 
+            $conflicting = Reservation::query()
+                ->where('id', '!=', $reservation->id)
+                ->where('room_id', $reservation->room_id)
+                ->where('date', $reservation->date)
+                ->where('status', 'pending')
+                ->where('start_time', '<', $reservation->end_time)
+                ->where('end_time', '>', $reservation->start_time)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
             NotificationController::createNotification(
-                $c->user_id,
-                'Reservasi Ditolak (Bentrok Jadwal)',
-                "Pengajuan peminjaman " . ($c->room?->name ?? 'ruangan') . " pada " . $c->date->format('d/m/Y') . " otomatis ditolak karena bentrok dengan jadwal reservasi lain yang disetujui.",
-                'reservation_rejected',
-                '/reservations/' . $c->id
+                $reservation->user_id,
+                'Reservasi Disetujui',
+                'Pengajuan peminjaman '.($reservation->room?->name ?? 'ruangan').' pada '.$reservation->date->format('d/m/Y').' telah disetujui admin.',
+                'reservation_approved',
+                '/reservations/'.$reservation->id
             );
+
+            foreach ($conflicting as $conflict) {
+                $conflict->update([
+                    'status' => 'rejected',
+                    'admin_notes' => 'Otomatis ditolak: Slot disetujui untuk RSV-'.str_pad((string) $reservation->id, 4, '0', STR_PAD_LEFT).'.',
+                    'reviewed_by' => Auth::id(),
+                ]);
+
+                NotificationController::createNotification(
+                    $conflict->user_id,
+                    'Reservasi Ditolak (Bentrok Jadwal)',
+                    'Pengajuan peminjaman '.($conflict->room?->name ?? 'ruangan').' pada '.$conflict->date->format('d/m/Y').' otomatis ditolak karena bentrok dengan reservasi yang disetujui.',
+                    'reservation_rejected',
+                    '/reservations/'.$conflict->id
+                );
+            }
+
+            return null;
+        }, attempts: 3);
+
+        if ($failure !== null) {
+            return redirect()->back()->with('error', $failure);
         }
 
-        return redirect()->back()->with('success', 'Reservasi berhasil DISETUJUI. Request lain yang bentrok telah otomatis ditolak oleh sistem.');
+        return redirect()->back()->with('success', 'Reservasi disetujui; pengajuan pending yang bertabrakan otomatis ditolak.');
     }
 
     /**
@@ -260,22 +365,37 @@ class ReservationController extends Controller
     public function adminReject(Request $request, $id)
     {
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
-        $reservation = Reservation::findOrFail($numericId);
-
-        $adminNote = $request->input('admin_note', 'Ditolak: Ruangan tidak dapat digunakan pada waktu yang diminta.');
-        $reservation->update([
-            'status' => 'rejected',
-            'admin_notes' => $adminNote,
+        $validated = $request->validate([
+            'admin_note' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        // Trigger notification for the applicant
-        NotificationController::createNotification(
-            $reservation->user_id,
-            'Reservasi Ditolak',
-            "Pengajuan peminjaman " . ($reservation->room?->name ?? 'ruangan') . " pada " . $reservation->date->format('d/m/Y') . " ditolak oleh admin. Catatan: {$adminNote}",
-            'reservation_rejected',
-            '/reservations/' . $reservation->id
-        );
+        $failure = DB::transaction(function () use ($numericId, $validated): ?string {
+            $reservation = Reservation::query()->whereKey($numericId)->lockForUpdate()->firstOrFail();
+            if ($reservation->status !== 'pending') {
+                return 'Hanya reservasi yang masih menunggu yang dapat ditolak.';
+            }
+
+            $adminNote = $validated['admin_note'] ?? 'Ditolak: Ruangan tidak dapat digunakan pada waktu yang diminta.';
+            $reservation->update([
+                'status' => 'rejected',
+                'admin_notes' => $adminNote,
+                'reviewed_by' => Auth::id(),
+            ]);
+
+            NotificationController::createNotification(
+                $reservation->user_id,
+                'Reservasi Ditolak',
+                'Pengajuan peminjaman '.($reservation->room?->name ?? 'ruangan').' pada '.$reservation->date->format('d/m/Y').' ditolak oleh admin. Catatan: '.$adminNote,
+                'reservation_rejected',
+                '/reservations/'.$reservation->id
+            );
+
+            return null;
+        }, attempts: 3);
+
+        if ($failure !== null) {
+            return redirect()->back()->with('error', $failure);
+        }
 
         return redirect()->back()->with('success', 'Reservasi berhasil DITOLAK.');
     }

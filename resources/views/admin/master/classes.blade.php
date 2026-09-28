@@ -8,13 +8,13 @@
     {{-- Header & Toolbar --}}
     <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="relative w-full sm:w-72">
-            <input type="text" placeholder="Cari kelas..." class="form-input text-xs pl-9">
+            <input id="classSearch" type="text" placeholder="Cari kelas..." class="form-input text-xs pl-9">
             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
         </div>
-        <button onclick="showToast('Fitur tambah kelas (Master Data)', 'info')" class="btn btn-primary text-xs shrink-0">
+        <a href="{{ url('/admin/classes/create') }}" class="btn btn-primary text-xs shrink-0">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Tambah Kelas
-        </button>
+        </a>
     </div>
 
     {{-- Stats --}}
@@ -49,7 +49,7 @@
                 </thead>
                 <tbody>
                     @foreach($classes as $c)
-                        <tr>
+                        <tr data-class-row>
                             <td>
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
@@ -71,8 +71,12 @@
                             </td>
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button onclick="showToast('Detail kelas {{ $c['name'] }}', 'info')" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Detail</button>
-                                    <button onclick="showToast('Edit kelas {{ $c['name'] }}', 'info')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</button>
+                                    <a href="{{ url('/admin/classes/'.$c['id'].'/edit') }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/classes/'.$c['id']) }}" onsubmit="return confirm('Hapus kelas ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -82,4 +86,16 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    const classSearch = document.getElementById('classSearch');
+    classSearch.addEventListener('input', () => {
+        const query = classSearch.value.trim().toLocaleLowerCase();
+        document.querySelectorAll('[data-class-row]').forEach((row) => {
+            row.hidden = !row.textContent.toLocaleLowerCase().includes(query);
+        });
+    });
+</script>
 @endsection
