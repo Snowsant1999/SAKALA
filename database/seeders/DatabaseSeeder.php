@@ -12,9 +12,12 @@ class DatabaseSeeder extends Seeder
     {
         // Disable foreign key checks for clean truncation
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('schedule_exceptions')->truncate();
         DB::table('aspirations')->truncate();
+        DB::table('report_status_histories')->truncate();
         DB::table('reports')->truncate();
         DB::table('reservations')->truncate();
+        DB::table('notifications')->truncate();
         DB::table('assignment_submissions')->truncate();
         DB::table('assignments')->truncate();
         DB::table('materials')->truncate();
@@ -24,6 +27,7 @@ class DatabaseSeeder extends Seeder
         DB::table('cohorts')->truncate();
         DB::table('courses')->truncate();
         DB::table('rooms')->truncate();
+        DB::table('floors')->truncate();
         DB::table('buildings')->truncate();
         DB::table('users')->truncate();
         DB::table('study_programs')->truncate();
@@ -306,6 +310,21 @@ class DatabaseSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        foreach (DB::table('rooms')->select('building_id', 'floor')->distinct()->get() as $roomFloor) {
+            $floorId = DB::table('floors')->insertGetId([
+                'building_id' => $roomFloor->building_id,
+                'number' => $roomFloor->floor,
+                'label' => 'Lantai '.$roomFloor->floor,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            DB::table('rooms')
+                ->where('building_id', $roomFloor->building_id)
+                ->where('floor', $roomFloor->floor)
+                ->update(['floor_id' => $floorId]);
+        }
+
         // 5. Courses & Classes
         $cWeb = DB::table('courses')->insertGetId([
             'code' => 'TI-401',
@@ -443,6 +462,19 @@ class DatabaseSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+        ]);
+
+        $cancelledScheduleId = DB::table('schedules')
+            ->where('course_class_id', $classWebB)
+            ->where('day', 'Selasa')
+            ->value('id');
+        DB::table('schedule_exceptions')->insert([
+            'schedule_id' => $cancelledScheduleId,
+            'date' => now()->next('Tuesday')->format('Y-m-d'),
+            'cancelled_by' => $dosenBudi,
+            'reason' => 'Dosen berhalangan hadir pada tanggal ini.',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         // 7. Materials

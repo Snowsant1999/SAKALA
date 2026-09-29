@@ -236,7 +236,6 @@ class AdminMasterDataController extends Controller
                 $select('mode', 'Mode', [
                     ['value' => 'ONSITE', 'label' => 'Tatap muka'],
                     ['value' => 'ONLINE', 'label' => 'Daring'],
-                    ['value' => 'CANCELLED', 'label' => 'Dibatalkan'],
                 ]),
             ],
             default => abort(404),
@@ -324,7 +323,7 @@ class AdminMasterDataController extends Controller
                 'day' => ['required', Rule::in(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'])],
                 'start_time' => ['required', 'date_format:H:i'],
                 'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
-                'mode' => ['required', Rule::in(['ONSITE', 'ONLINE', 'CANCELLED'])],
+                'mode' => ['required', Rule::in(['ONSITE', 'ONLINE'])],
             ],
             default => abort(404),
         };

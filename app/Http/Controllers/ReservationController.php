@@ -7,6 +7,7 @@ use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\User;
 use App\Services\ReservationConflictDetector;
+use App\Services\ScheduleAvailabilityService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -135,7 +136,7 @@ class ReservationController extends Controller
     /**
      * Store new reservation request.
      */
-    public function store(Request $request)
+    public function store(Request $request, ScheduleAvailabilityService $scheduleAvailability)
     {
         $user = Auth::user();
         $data = $request->validate([
@@ -180,6 +181,17 @@ class ReservationController extends Controller
             ->exists();
         if ($approvedConflict) {
             throw ValidationException::withMessages(['room_id' => 'Ruangan sudah memiliki reservasi yang disetujui pada rentang waktu tersebut.']);
+        }
+
+        if ($scheduleAvailability->conflicts(
+            (int) $data['room_id'],
+            $data['date'],
+            $data['start_time'],
+            $data['end_time'],
+        )) {
+            throw ValidationException::withMessages([
+                'room_id' => 'Ruangan digunakan oleh jadwal kuliah tetap pada rentang waktu tersebut.',
+            ]);
         }
 
         $reservation = Reservation::create([
@@ -304,14 +316,14 @@ class ReservationController extends Controller
     /**
      * Admin approve reservation (/admin/reservations/{id}/approve).
      */
-    public function adminApprove(Request $request, $id)
+    public function adminApprove(Request $request, ScheduleAvailabilityService $scheduleAvailability, $id)
     {
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
         $validated = $request->validate([
             'admin_note' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $failure = DB::transaction(function () use ($numericId, $validated): ?string {
+        $failure = DB::transaction(function () use ($numericId, $validated, $scheduleAvailability): ?string {
             $reservation = Reservation::query()->whereKey($numericId)->lockForUpdate()->firstOrFail();
             if ($reservation->status !== 'pending') {
                 return 'Hanya reservasi yang masih menunggu yang dapat disetujui.';
@@ -328,6 +340,15 @@ class ReservationController extends Controller
 
             if ($approvedOverlap) {
                 return 'Tidak dapat menyetujui reservasi karena slot waktu sudah dikunci oleh reservasi lain.';
+            }
+
+            if ($scheduleAvailability->conflicts(
+                (int) $reservation->room_id,
+                $reservation->date->toDateString(),
+                $reservation->start_time,
+                $reservation->end_time,
+            )) {
+                return 'Tidak dapat menyetujui reservasi karena slot berbenturan dengan jadwal kuliah tetap.';
             }
 
             $adminNote = $validated['admin_note'] ?? 'Disetujui oleh Admin Akademik SAKALA.';

@@ -565,7 +565,9 @@ body {
     position: absolute;
     inset: 0;
     z-index: -1;
-    background-color: rgba(128, 128, 128, 0.25);
+    background-color: rgba(8, 13, 28, 0.38);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     pointer-events: none;
 }
 

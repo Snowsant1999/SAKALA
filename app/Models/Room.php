@@ -17,7 +17,7 @@ class Room extends Model
 
     public function floorRecord(): BelongsTo
     {
-        return $this->belongsTo(Floor::class);
+        return $this->belongsTo(Floor::class, 'floor_id');
     }
 
     public function schedules(): HasMany

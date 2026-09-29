@@ -96,6 +96,17 @@
                                 <div class="font-medium text-slate-700">{{ $schedule['program'] ?? '-' }} {{ $schedule['class'] ?? '' }}</div>
                             </div>
                         </div>
+                        @if($schedule['status'] == 'OCCUPIED' && $schedule['canManageException'])
+                            <form action="{{ url('/schedules/'.$schedule['scheduleId'].'/exceptions') }}" method="POST" class="mt-4 pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-end gap-3">
+                                @csrf
+                                <input type="hidden" name="date" value="{{ $selectedDate }}">
+                                <div class="flex-1">
+                                    <label class="form-label text-xs" for="exception-reason-{{ $schedule['scheduleId'] }}">Alasan (opsional)</label>
+                                    <input type="text" name="reason" id="exception-reason-{{ $schedule['scheduleId'] }}" class="form-input" maxlength="1000" placeholder="Contoh: dosen berhalangan hadir">
+                                </div>
+                                <button type="submit" class="btn btn-secondary">Kosongkan sesi tanggal ini</button>
+                            </form>
+                        @endif
                     </div>
                 @elseif($schedule['status'] == 'MAINTENANCE_SLOT')
                     {{-- Maintenance Slot --}}
@@ -123,16 +134,29 @@
                     <div class="bg-emerald-50/60 rounded-xl p-5 border border-emerald-200 hover:border-emerald-300 hover:shadow-md transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <div class="text-lg font-bold text-slate-800">{{ $schedule['time'] }}</div>
+                            @if(str_starts_with($schedule['course'], 'Sesi dibatalkan:'))
+                                <div class="text-sm font-semibold text-slate-700 mt-1">{{ $schedule['course'] }}</div>
+                            @endif
                             <div class="text-sm font-medium text-emerald-600 mt-1 flex items-center gap-1.5">
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                Kosong (Tersedia untuk Pengajuan)
+                                {{ str_starts_with($schedule['course'], 'Sesi dibatalkan:') ? 'Kelas tidak menggunakan ruangan pada tanggal ini' : 'Kosong (Tersedia untuk Pengajuan)' }}
                             </div>
+                            @if($schedule['exceptionReason'])
+                                <div class="text-sm text-slate-500 mt-1">Alasan: {{ $schedule['exceptionReason'] }}</div>
+                            @endif
                         </div>
                         <a href="{{ $createUrl }}" class="btn btn-success">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                             Ajukan Reservasi
                         </a>
                     </div>
+                    @if($schedule['exceptionId'] && $schedule['canManageException'])
+                        <form action="{{ url('/schedules/'.$schedule['scheduleId'].'/exceptions/'.$schedule['exceptionId']) }}" method="POST" class="-mt-2 text-right">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-sm font-semibold text-navy-700 hover:text-navy-900">Pulihkan jadwal kelas</button>
+                        </form>
+                    @endif
                 @endif
             @empty
                 <div class="p-8 text-center text-slate-500 bg-white rounded-xl border border-slate-200">

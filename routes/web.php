@@ -11,6 +11,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\RoomController;
+use App\Http\Controllers\ScheduleExceptionController;
 use Illuminate\Support\Facades\Route;
 
 // Auth Routes
@@ -39,6 +40,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/courses/{id}/assignments', [CourseController::class, 'addAssignment']);
     Route::post('/courses/{id}/assignments/{assignmentId}/submit', [CourseController::class, 'submitAssignment']);
     Route::get('/schedule', [CourseController::class, 'schedule']);
+    Route::post('/schedules/{schedule}/exceptions', [ScheduleExceptionController::class, 'store']);
+    Route::delete('/schedules/{schedule}/exceptions/{exception}', [ScheduleExceptionController::class, 'destroy']);
 
     // Rooms Module
     Route::get('/rooms', [RoomController::class, 'index']);

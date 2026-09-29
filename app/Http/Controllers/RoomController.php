@@ -125,11 +125,16 @@ class RoomController extends Controller
         return $query->with([
             'schedules' => fn ($scheduleQuery) => $scheduleQuery
                 ->where('day', $day)
-                ->with(['courseClass.course', 'courseClass.lecturer']),
+                ->with([
+                    'courseClass.course',
+                    'courseClass.lecturer',
+                    'exceptions' => fn ($exceptionQuery) => $exceptionQuery
+                        ->whereDate('date', $selectedDate->toDateString()),
+                ]),
             'reservations' => fn ($reservationQuery) => $reservationQuery
                 ->whereDate('date', $selectedDate->toDateString())
                 ->where('status', 'approved')
-                ->with('user'),
+                ->with(['user', 'courseClass.cohort.studyProgram']),
         ]);
     }
 
@@ -142,14 +147,26 @@ class RoomController extends Controller
                 continue;
             }
 
+            $exception = $schedule->exceptions->first();
+            $courseName = $schedule->courseClass?->course?->name ?? 'Mata Kuliah';
+            $user = auth()->user();
+            $canManageException = $user && (
+                $user->role === 'admin'
+                || ($user->role === 'dosen' && (int) $schedule->courseClass?->lecturer_id === (int) $user->id)
+            );
+
             $events[] = [
                 'start' => substr($schedule->start_time, 0, 5),
                 'end' => substr($schedule->end_time, 0, 5),
-                'status' => 'OCCUPIED',
-                'course' => $schedule->courseClass?->course?->name ?? 'Mata Kuliah',
+                'status' => $exception ? 'AVAILABLE' : 'OCCUPIED',
+                'course' => $exception ? 'Sesi dibatalkan: '.$courseName : $courseName,
                 'lecturer' => $schedule->courseClass?->lecturer?->name ?? '-',
                 'program' => 'TI',
                 'class' => $schedule->courseClass?->name ?? '5A',
+                'scheduleId' => $schedule->id,
+                'exceptionId' => $exception?->id,
+                'exceptionReason' => $exception?->reason,
+                'canManageException' => $canManageException,
             ];
         }
 
@@ -160,8 +177,12 @@ class RoomController extends Controller
                 'status' => 'RESERVED_SLOT',
                 'course' => 'Reservasi: '.$reservation->purpose,
                 'lecturer' => $reservation->user?->name ?? 'User',
-                'program' => 'Mahasiswa / Dosen',
-                'class' => '',
+                'program' => $reservation->courseClass?->cohort?->studyProgram?->name ?? 'Tidak terkait prodi',
+                'class' => $reservation->courseClass?->name ?? 'Tidak terkait kelas',
+                'scheduleId' => null,
+                'exceptionId' => null,
+                'exceptionReason' => null,
+                'canManageException' => false,
             ];
         }
 
@@ -177,9 +198,11 @@ class RoomController extends Controller
         for ($index = 0; $index < count($boundaries) - 1; $index++) {
             $start = $boundaries[$index];
             $end = $boundaries[$index + 1];
-            $matchingEvent = collect($events)->first(
+            $matchingEvents = collect($events)->filter(
                 fn (array $event): bool => $event['start'] <= $start && $event['end'] >= $end,
             );
+            $matchingEvent = $matchingEvents->first(fn (array $event): bool => $event['status'] !== 'AVAILABLE')
+                ?? $matchingEvents->first();
             $isAvailableWindow = collect(self::AVAILABLE_WINDOWS)->contains(
                 fn (array $window): bool => $window['start'] <= $start && $window['end'] >= $end,
             );
@@ -195,6 +218,10 @@ class RoomController extends Controller
                 'program' => $matchingEvent['program'] ?? '-',
                 'class' => $matchingEvent['class'] ?? '',
                 'status' => $matchingEvent['status'] ?? 'AVAILABLE',
+                'scheduleId' => $matchingEvent['scheduleId'] ?? null,
+                'exceptionId' => $matchingEvent['exceptionId'] ?? null,
+                'exceptionReason' => $matchingEvent['exceptionReason'] ?? null,
+                'canManageException' => $matchingEvent['canManageException'] ?? false,
             ];
         }
 
