@@ -5,6 +5,7 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+/.claude
 /.codex
 /.cursor/
 /.idea
@@ -26,3 +27,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 PRD-SAKALA.md
+CLAUDE.md
+/combo.txt
+/final-verify.txt
+/test-output.txt
+/verify.txt

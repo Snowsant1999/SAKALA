@@ -3,87 +3,59 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    /**
-     * Mock user accounts for demo purposes.
-     */
-    private array $mockUsers = [
-        'student@sakala.test' => [
-            'id' => 'usr-001',
-            'name' => 'Andi Pratama',
-            'email' => 'student@sakala.test',
-            'role' => 'student',
-            'nim' => '2341720001',
-            'departmentId' => 'dept-01',
-            'studyProgramId' => 'sp-01',
-        ],
-        'lecturer@sakala.test' => [
-            'id' => 'usr-004',
-            'name' => 'Dr. Budi Santoso',
-            'email' => 'lecturer@sakala.test',
-            'role' => 'lecturer',
-            'nidn' => '0012345678',
-            'departmentId' => 'dept-01',
-            'studyProgramId' => 'sp-01',
-        ],
-        'admin@sakala.test' => [
-            'id' => 'usr-006',
-            'name' => 'Admin SAKALA',
-            'email' => 'admin@sakala.test',
-            'role' => 'admin',
-        ],
-    ];
-
     /**
      * Show the login form.
      */
     public function login()
     {
-        if (session('user_role')) {
-            return $this->redirectByRole(session('user_role'));
+        if (Auth::check()) {
+            return $this->redirectByRole(Auth::user()->role);
         }
 
         return view('auth.login');
     }
 
     /**
-     * Authenticate using mock data (session-based).
+     * Authenticate using real DB.
      */
     public function authenticate(Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
         ]);
 
-        $email = $request->input('email');
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
+            
+            // For backward compatibility in views temporarily
+            $user = Auth::user();
+            session([
+                'user_name' => $user->name,
+                'user_role' => $user->role,
+            ]);
 
-        if (!isset($this->mockUsers[$email])) {
-            return back()->with('error', 'Email tidak ditemukan. Gunakan salah satu demo account.')->withInput();
+            return $this->redirectByRole($user->role);
         }
 
-        $user = $this->mockUsers[$email];
-
-        // Store user data in session
-        session([
-            'user_id' => $user['id'],
-            'user_name' => $user['name'],
-            'user_email' => $user['email'],
-            'user_role' => $user['role'],
-            'user_data' => $user,
-        ]);
-
-        return $this->redirectByRole($user['role']);
+        return back()->withErrors([
+            'email' => 'Email atau password salah.',
+        ])->onlyInput('email');
     }
 
     /**
-     * Logout — clear session and redirect to login.
+     * Logout.
      */
-    public function logout()
+    public function logout(Request $request)
     {
-        session()->flush();
+        Auth::logout();
+        
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return redirect('/login')->with('success', 'Berhasil logout.');
     }

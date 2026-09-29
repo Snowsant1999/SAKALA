@@ -11,16 +11,16 @@
             <svg class="w-6 h-6 text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.25-8.25-3.286Zm0 13.036h.008v.008H12v-.008Z" /></svg>
         </div>
         <div class="space-y-1">
-            <h2 class="text-base font-bold text-white">Privasi & Kerahasiaan Anda Dijamin</h2>
+            <h2 class="text-base font-bold text-white">Privasi & Kerahasiaan</h2>
             <p class="text-xs text-slate-300 leading-relaxed">
-                Platform Kampus Aman SAKALA dirancang khusus untuk memberikan ruang aman bagi seluruh civitas akademika. Laporan yang Anda kirimkan bersifat <strong>rahasia (confidential)</strong>, hanya dapat diakses oleh Anda dan Satgas Penanganan Kampus yang berwenang.
+                Laporan Kampus Aman bersifat rahasia dan hanya dapat diakses oleh Anda serta admin SAKALA yang berwenang.
             </p>
         </div>
     </div>
 
     {{-- Report Form Card --}}
     <div class="card p-8">
-        <form action="{{ url('/reports') }}" method="POST" class="space-y-6">
+        <form action="{{ url('/reports') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
             @csrf
 
             {{-- Category & Date --}}
@@ -33,8 +33,10 @@
                         <option value="Pelecehan Verbal">Pelecehan Verbal</option>
                         <option value="Pelecehan Non-Verbal">Pelecehan Non-Verbal / Fisik</option>
                         <option value="Kekerasan">Tindakan Kekerasan</option>
-                        <option value="Lainnya">Lainnya / Pelanggaran Etika</option>
+                        <option value="Pelanggaran Etika">Pelanggaran Etika & Kode Etik</option>
+                        <option value="Lainnya">Lainnya (Isu Keamanan & Kesejahteraan Mahasiswa)</option>
                     </select>
+                    <p class="text-[11px] text-slate-400 mt-1">Untuk keluhan AC, proyektor, atau sarana belajar, gunakan menu <a href="{{ url('/aspirations/create') }}" class="text-navy-600 font-semibold underline">Layanan Aspirasi & Fasilitas</a>.</p>
                 </div>
 
                 <div class="form-group">
@@ -62,17 +64,18 @@
                 <textarea name="description" id="description" rows="5" class="form-input" placeholder="Ceritakan apa yang terjadi, kapan, bagaimana situasi kejadian, dan dampak yang Anda rasakan secara jelas..." required></textarea>
             </div>
 
-            {{-- Mock Attachment Upload --}}
+            {{-- Private evidence upload --}}
             <div class="form-group">
-                <label class="form-label">Bukti Pendukung / Lampiran (Mock Upload)</label>
-                <input type="text" name="attachments" class="form-input" placeholder="Nama berkas bukti (mis. bukti_chat.png / rekaman.mp3)" value="bukti_lampiran_insiden_{{ date('dmY') }}.pdf">
-                <p class="text-[11px] text-slate-400 mt-1">Simulasi upload dokumen bukti (tangkapan layar chat, foto, rekaman suara, atau dokumen pendukung).</p>
+                <label class="form-label" for="attachment">Bukti Pendukung / Lampiran (Opsional)</label>
+                <input type="file" name="attachment" id="attachment" class="form-input" accept=".pdf,.jpg,.jpeg,.png,.mp3,.mp4">
+                @error('attachment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                <p class="text-[11px] text-slate-400 mt-1">File disimpan secara privat dan hanya dapat diakses oleh pelapor atau admin berwenang.</p>
             </div>
 
             {{-- Security Notice --}}
             <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-3">
                 <svg class="w-5 h-5 text-emerald-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                <span>Identitas pelapor terenkripsi dan dijaga kerahasiaannya oleh sistem.</span>
+                Nama lengkap pelapor hanya ditampilkan kepada admin SAKALA yang berwenang.
             </div>
 
             {{-- Submit Actions --}}

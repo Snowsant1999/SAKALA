@@ -23,7 +23,7 @@
                 <h1 class="text-2xl font-extrabold">{{ $course['name'] }}</h1>
             </div>
 
-            @if(session('user_role') === 'lecturer' || session('user_role') === 'admin')
+            @if(session('user_role') === 'dosen' || session('user_role') === 'admin')
                 <button onclick="document.getElementById('add-material-modal').classList.remove('hidden')" class="btn bg-white text-navy-700 hover:bg-slate-100 shadow-md font-semibold">
                     <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     Tambah Materi Baru
@@ -82,7 +82,7 @@
                         Unduh Materi
                     </button>
 
-                    @if(session('user_role') === 'lecturer' || session('user_role') === 'admin')
+                    @if(session('user_role') === 'dosen' || session('user_role') === 'admin')
                         <form action="{{ url('/courses/' . $course['id'] . '/materials/' . $m['id']) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus materi ini?')">
                             @csrf
                             @method('DELETE')

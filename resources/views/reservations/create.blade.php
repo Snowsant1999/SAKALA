@@ -30,8 +30,6 @@
         <form action="{{ url('/reservations') }}" method="POST" class="space-y-6">
             @csrf
 
-            <input type="hidden" name="room_id" value="{{ request('room_id', 'rm-004') }}">
-
             {{-- 1. Room Details Section --}}
             <div class="pb-6 border-b border-slate-100">
                 <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
@@ -39,20 +37,24 @@
                     Detail Ruangan Terpilih
                 </h3>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                        <label class="form-label text-xs">Gedung</label>
-                        <input type="text" name="building" class="form-input bg-slate-50 font-medium" value="{{ request('building', 'Gedung Teknologi Informasi') }}" readonly>
+                @if($room)
+                    <input type="hidden" name="room_id" value="{{ old('room_id', $room->id) }}">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div><label class="form-label text-xs">Gedung</label><input type="text" class="form-input bg-slate-50 font-medium" value="{{ $room->building?->name }}" readonly></div>
+                        <div><label class="form-label text-xs">Lantai</label><input type="text" class="form-input bg-slate-50 font-medium" value="{{ $room->floorRecord?->label ?? 'Lantai '.$room->floor }}" readonly></div>
+                        <div><label class="form-label text-xs">Ruangan</label><input type="text" class="form-input bg-slate-50 font-bold text-navy-700" value="{{ $room->name }}" readonly></div>
                     </div>
+                @else
                     <div>
-                        <label class="form-label text-xs">Lantai</label>
-                        <input type="text" name="floor" class="form-input bg-slate-50 font-medium" value="{{ request('floor', 'Lantai 2') }}" readonly>
+                        <label class="form-label text-xs" for="room_id">Ruangan</label>
+                        <select name="room_id" id="room_id" class="form-select" required>
+                            <option value="">Pilih ruangan</option>
+                            @foreach($rooms as $availableRoom)
+                                <option value="{{ $availableRoom->id }}" @selected((string) old('room_id') === (string) $availableRoom->id)>{{ $availableRoom->building?->name }} · {{ $availableRoom->floorRecord?->label ?? 'Lantai '.$availableRoom->floor }} · {{ $availableRoom->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div>
-                        <label class="form-label text-xs">Ruangan</label>
-                        <input type="text" name="room_name" class="form-input bg-slate-50 font-bold text-navy-700" value="{{ request('room_name', 'Lab Rekayasa Komputer') }}" readonly>
-                    </div>
-                </div>
+                @endif
             </div>
 
             {{-- 2. Date & Time Section --}}
@@ -65,15 +67,15 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="form-label text-xs" for="date">Tanggal Kegiatan</label>
-                        <input type="date" name="date" id="date" class="form-input" value="{{ request('date', date('Y-m-d', strtotime('+1 day'))) }}" required>
+                        <input type="date" name="date" id="date" class="form-input" min="{{ today()->toDateString() }}" value="{{ old('date', $date) }}" required>
                     </div>
                     <div>
                         <label class="form-label text-xs" for="start_time">Jam Mulai</label>
-                        <input type="time" name="start_time" id="start_time" class="form-input" value="{{ request('start_time', '13:00') }}" required>
+                        <input type="time" name="start_time" id="start_time" class="form-input" value="{{ old('start_time', $startTime) }}" required>
                     </div>
                     <div>
                         <label class="form-label text-xs" for="end_time">Jam Selesai</label>
-                        <input type="time" name="end_time" id="end_time" class="form-input" value="{{ request('end_time', '15:00') }}" required>
+                        <input type="time" name="end_time" id="end_time" class="form-input" value="{{ old('end_time', $endTime) }}" required>
                     </div>
                 </div>
             </div>
@@ -87,29 +89,33 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div class="form-group">
-                        <label class="form-label text-xs" for="course">Mata Kuliah / Kegiatan Terkait</label>
-                        <select name="course" id="course" class="form-select" required>
+                        <label class="form-label text-xs" for="course_id">Mata Kuliah Terkait</label>
+                        <select name="course_id" id="course_id" class="form-select">
+                            <option value="">Kegiatan umum</option>
                             @foreach($courses as $c)
-                                <option value="{{ $c['name'] }}">{{ $c['name'] }} ({{ $c['code'] }})</option>
+                                <option value="{{ $c['id'] }}" @selected((string) old('course_id') === (string) $c['id'])>{{ $c['name'] }} ({{ $c['code'] }})</option>
                             @endforeach
-                            <option value="Kegiatan Himpunan Mahasiswa">Kegiatan Himpunan Mahasiswa</option>
-                            <option value="Ujian / Sertifikasi Kompetensi">Ujian / Sertifikasi Kompetensi</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label text-xs" for="class">Kelas / Kelompok</label>
-                        <input type="text" name="class" id="class" class="form-input" value="TIM 5A" placeholder="Contoh: TIM 5A / Panitia Workshop" required>
+                        <label class="form-label text-xs" for="course_class_id">Kelas</label>
+                        <select name="course_class_id" id="course_class_id" class="form-select">
+                            <option value="">Tidak terkait kelas</option>
+                            @foreach($classes as $class)
+                                <option value="{{ $class['id'] }}" data-course-id="{{ $class['course_id'] }}" @selected((string) old('course_class_id') === (string) $class['id'])>{{ $class['name'] }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label text-xs" for="purpose">Tujuan & Urgensi Penggunaan</label>
-                    <textarea name="purpose" id="purpose" rows="3" class="form-input" placeholder="Jelaskan secara rinci kegiatan yang akan dilakukan (mis. Praktikum tambahan konfigurasi routing, ujian susulan, dll)..." required>Praktikum tambahan konfigurasi router dan switch jaringan</textarea>
+                    <textarea name="purpose" id="purpose" rows="3" class="form-input" placeholder="Jelaskan kegiatan yang akan dilakukan..." required>{{ old('purpose') }}</textarea>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label text-xs" for="notes">Catatan Tambahan untuk Admin (Opsional)</label>
-                    <textarea name="notes" id="notes" rows="2" class="form-input" placeholder="Tuliskan peralatan khusus atau software yang dibutuhkan jika ada..."></textarea>
+                    <textarea name="notes" id="notes" rows="2" class="form-input" placeholder="Tuliskan peralatan khusus atau catatan tambahan...">{{ old('notes') }}</textarea>
                 </div>
             </div>
 

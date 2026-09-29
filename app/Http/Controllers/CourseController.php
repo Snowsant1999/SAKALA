@@ -2,42 +2,112 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\MockDataService;
+use App\Models\Assignment;
+use App\Models\AssignmentSubmission;
+use App\Models\CourseClass;
+use App\Models\Material;
+use App\Models\Schedule;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CourseController extends Controller
 {
+    /**
+     * Helper to format a CourseClass model to array for views.
+     */
+    private function formatCourseClass(CourseClass $class): array
+    {
+        $firstSchedule = $class->schedules->first();
+        $startTime = $firstSchedule ? substr($firstSchedule->start_time, 0, 5) : '08:00';
+        $endTime = $firstSchedule ? substr($firstSchedule->end_time, 0, 5) : '10:00';
+
+        return [
+            'id' => $class->id,
+            'code' => $class->course?->code ?? 'MK',
+            'name' => $class->course?->name ?? 'Mata Kuliah',
+            'sks' => $class->course?->credits ?? 3,
+            'semester' => $class->course?->semester ?? 5,
+            'lecturer' => $class->lecturer?->name ?? 'Dosen Pengampu',
+            'lecturer_email' => $class->lecturer?->email ?? '',
+            'class' => $class->name,
+            'room' => $firstSchedule?->room?->name ?? 'Daring (Zoom)',
+            'day' => $firstSchedule?->day ?? 'Senin',
+            'time' => $startTime.' - '.$endTime,
+            'mode' => strtoupper($firstSchedule?->mode ?? 'ONSITE'),
+            'department' => $class->cohort?->studyProgram?->department?->name ?? 'Teknologi Informasi',
+            'study_program' => $class->cohort?->studyProgram?->name ?? 'Belum ditentukan',
+            'description' => 'Mata kuliah terstruktur yang membekali mahasiswa dengan kemampuan teoretis dan aplikatif sesuai kurikulum berbasis kompetensi.',
+            'students_count' => $class->students()->count(),
+        ];
+    }
+
+    private function assertCanAccessClass(CourseClass $class): void
+    {
+        $user = Auth::user();
+
+        if ($user->role === 'mahasiswa' && ($user->cohort_id === null || $class->cohort_id !== $user->cohort_id)) {
+            abort(404);
+        }
+
+        if ($user->role === 'dosen' && (int) $class->lecturer_id !== (int) $user->id) {
+            abort(404);
+        }
+    }
+
+    private function assertCanManageClass(CourseClass $class): void
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'admin' && ($user->role !== 'dosen' || (int) $class->lecturer_id !== (int) $user->id)) {
+            abort(403);
+        }
+    }
+
     /**
      * List all courses.
      */
     public function index(Request $request)
     {
-        $allCourses = MockDataService::getCourses();
-        $userRole = session('user_role', 'student');
-        $userEmail = session('user_email', 'student@sakala.test');
+        $user = Auth::user();
+        $query = CourseClass::with(['course', 'lecturer', 'schedules.room', 'cohort.studyProgram.department']);
 
-        // Filter for lecturer (only courses they teach)
-        if ($userRole === 'lecturer') {
-            $courses = array_filter($allCourses, fn($c) => $c['lecturer_email'] === $userEmail || $c['lecturer'] === 'Dr. Budi Santoso');
-        } else {
-            $courses = $allCourses;
+        if ($user->role === 'mahasiswa') {
+            if ($user->cohort_id === null) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('cohort_id', $user->cohort_id);
+            }
+        } elseif ($user->role === 'dosen') {
+            $query->where('lecturer_id', $user->id);
         }
 
         // Search filter
         $search = $request->query('q');
         if ($search) {
-            $courses = array_filter($courses, fn($c) => 
-                stripos($c['name'], $search) !== false || 
-                stripos($c['code'], $search) !== false ||
-                stripos($c['lecturer'], $search) !== false
-            );
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('course', function ($cq) use ($search) {
+                        $cq->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('lecturer', function ($lq) use ($search) {
+                        $lq->where('name', 'like', "%{$search}%");
+                    });
+            });
         }
 
         // Semester filter
         $semester = $request->query('semester');
         if ($semester && $semester !== 'all') {
-            $courses = array_filter($courses, fn($c) => (string)$c['semester'] === (string)$semester);
+            $query->whereHas('course', function ($cq) use ($semester) {
+                $cq->where('semester', $semester);
+            });
         }
+
+        $classes = $query->get();
+        $courses = $classes->map(fn ($c) => $this->formatCourseClass($c))->toArray();
 
         return view('academic.courses.index', compact('courses', 'search', 'semester'));
     }
@@ -47,13 +117,43 @@ class CourseController extends Controller
      */
     public function show($id)
     {
-        $course = MockDataService::getCourse($id);
-        if (!$course) {
-            abort(404, 'Mata kuliah tidak ditemukan');
-        }
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials', 'assignments.submissions', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
+        $course = $this->formatCourseClass($class);
 
-        $materials = MockDataService::getMaterials($id);
-        $assignments = MockDataService::getAssignments($id);
+        $materials = $class->materials->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'title' => $m->title,
+                'description' => $m->description ?? 'Modul materi perkuliahan',
+                'file_name' => basename($m->file_path ?? 'Materi_Kuliah.pdf'),
+                'file_size' => '2.4 MB',
+                'uploaded_at' => Carbon::parse($m->created_at)->translatedFormat('d F Y'),
+            ];
+        })->toArray();
+
+        $user = Auth::user();
+        $assignments = $class->assignments->map(function ($a) use ($user) {
+            $mySubmission = $user ? $a->submissions->where('student_id', $user->id)->first() : null;
+
+            return [
+                'id' => $a->id,
+                'title' => $a->title,
+                'description' => $a->description ?? 'Instruksi tugas',
+                'deadline' => Carbon::parse($a->deadline)->format('Y-m-d H:i'),
+                'is_submitted' => ! is_null($mySubmission),
+                'score' => $mySubmission?->score,
+                'feedback' => $mySubmission?->feedback,
+                'submission' => $mySubmission ? [
+                    'file_name' => basename($mySubmission->file_path),
+                    'submitted_at' => Carbon::parse($mySubmission->created_at)->translatedFormat('d M Y, H:i'),
+                    'grade' => $mySubmission->score,
+                    'feedback' => $mySubmission->feedback,
+                ] : null,
+                'late' => $mySubmission === null && Carbon::parse($a->deadline)->isPast(),
+                'submissions_count' => $a->submissions->count(),
+            ];
+        })->toArray();
 
         return view('academic.courses.show', compact('course', 'materials', 'assignments'));
     }
@@ -63,12 +163,20 @@ class CourseController extends Controller
      */
     public function materials($id)
     {
-        $course = MockDataService::getCourse($id);
-        if (!$course) {
-            abort(404, 'Mata kuliah tidak ditemukan');
-        }
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
+        $course = $this->formatCourseClass($class);
 
-        $materials = MockDataService::getMaterials($id);
+        $materials = $class->materials->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'title' => $m->title,
+                'description' => $m->description ?? 'Modul materi perkuliahan',
+                'file_name' => basename($m->file_path ?? 'Materi_Kuliah.pdf'),
+                'file_size' => '2.4 MB',
+                'uploaded_at' => Carbon::parse($m->created_at)->translatedFormat('d F Y'),
+            ];
+        })->toArray();
 
         return view('academic.courses.materials', compact('course', 'materials'));
     }
@@ -78,19 +186,22 @@ class CourseController extends Controller
      */
     public function addMaterial(Request $request, $id)
     {
-        $request->validate([
+        $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
-        MockDataService::addMaterial($id, [
-            'title' => $request->input('title'),
-            'description' => $request->input('description', ''),
-            'file_name' => $request->input('file_name', 'Materi_Kuliah_' . date('Ymd') . '.pdf'),
-            'file_size' => '2.8 MB',
+        $class = CourseClass::findOrFail($id);
+        $this->assertCanManageClass($class);
+
+        Material::create([
+            'course_class_id' => $class->id,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? '',
+            'file_path' => 'materials/Materi_'.time().'.pdf',
         ]);
 
-        return redirect('/courses/' . $id . '/materials')->with('success', 'Materi perkuliahan berhasil ditambahkan.');
+        return redirect('/courses/'.$id.'/materials')->with('success', 'Materi perkuliahan berhasil ditambahkan.');
     }
 
     /**
@@ -98,8 +209,12 @@ class CourseController extends Controller
      */
     public function deleteMaterial($id, $materialId)
     {
-        MockDataService::deleteMaterial($id, $materialId);
-        return redirect('/courses/' . $id . '/materials')->with('success', 'Materi berhasil dihapus.');
+        $class = CourseClass::findOrFail($id);
+        $this->assertCanManageClass($class);
+        $material = Material::where('course_class_id', $id)->findOrFail($materialId);
+        $material->delete();
+
+        return redirect('/courses/'.$id.'/materials')->with('success', 'Materi berhasil dihapus.');
     }
 
     /**
@@ -107,13 +222,34 @@ class CourseController extends Controller
      */
     public function assignments($id)
     {
-        $course = MockDataService::getCourse($id);
-        if (!$course) {
-            abort(404, 'Mata kuliah tidak ditemukan');
-        }
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'assignments.submissions', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
+        $course = $this->formatCourseClass($class);
+        $user = Auth::user();
 
-        $assignments = MockDataService::getAssignments($id);
-        $userEmail = session('user_email', 'student@sakala.test');
+        $assignments = $class->assignments->map(function ($a) use ($user) {
+            $mySubmission = $user ? $a->submissions->where('student_id', $user->id)->first() : null;
+
+            return [
+                'id' => $a->id,
+                'title' => $a->title,
+                'description' => $a->description ?? 'Instruksi tugas',
+                'deadline' => Carbon::parse($a->deadline)->format('Y-m-d H:i'),
+                'is_submitted' => ! is_null($mySubmission),
+                'score' => $mySubmission?->score,
+                'feedback' => $mySubmission?->feedback,
+                'submission' => $mySubmission ? [
+                    'file_name' => basename($mySubmission->file_path),
+                    'submitted_at' => Carbon::parse($mySubmission->created_at)->translatedFormat('d M Y, H:i'),
+                    'grade' => $mySubmission->score,
+                    'feedback' => $mySubmission->feedback,
+                ] : null,
+                'late' => $mySubmission === null && Carbon::parse($a->deadline)->isPast(),
+                'submissions_count' => $a->submissions->count(),
+            ];
+        })->toArray();
+
+        $userEmail = $user?->email ?? '';
 
         return view('academic.courses.assignments', compact('course', 'assignments', 'userEmail'));
     }
@@ -123,19 +259,36 @@ class CourseController extends Controller
      */
     public function addAssignment(Request $request, $id)
     {
-        $request->validate([
+        $data = $request->validate([
             'title' => 'required|string|max:255',
-            'deadline' => 'required',
+            'deadline' => ['required', 'date'],
             'description' => 'nullable|string',
         ]);
 
-        MockDataService::addAssignment($id, [
-            'title' => $request->input('title'),
-            'deadline' => $request->input('deadline'),
-            'description' => $request->input('description', ''),
+        $class = CourseClass::with('course')->findOrFail($id);
+        $this->assertCanManageClass($class);
+
+        $assignment = Assignment::create([
+            'course_class_id' => $class->id,
+            'title' => $data['title'],
+            'deadline' => Carbon::parse($data['deadline']),
+            'description' => $data['description'] ?? '',
+            'file_path' => 'assignments/Brief_'.time().'.pdf',
         ]);
 
-        return redirect('/courses/' . $id . '/assignments')->with('success', 'Tugas baru berhasil diterbitkan.');
+        // Notify students about the new assignment
+        $students = User::where('role', 'mahasiswa')->where('cohort_id', $class->cohort_id)->get();
+        foreach ($students as $student) {
+            NotificationController::createNotification(
+                $student->id,
+                'Tugas Baru: '.$assignment->title,
+                'Tugas baru untuk mata kuliah '.($class->course?->name ?? 'Mata Kuliah').' telah dipublikasikan.',
+                'assignment_new',
+                '/courses/'.$id.'/assignments'
+            );
+        }
+
+        return redirect('/courses/'.$id.'/assignments')->with('success', 'Tugas baru berhasil diterbitkan.');
     }
 
     /**
@@ -143,21 +296,88 @@ class CourseController extends Controller
      */
     public function submitAssignment(Request $request, $id, $assignmentId)
     {
-        $userEmail = session('user_email', 'student@sakala.test');
-        $fileName = $request->input('file_name', 'Tugas_Mahasiswa_' . session('user_name', 'Andi') . '.zip');
+        $user = Auth::user();
+        if (! $user) {
+            return redirect('/login');
+        }
 
-        MockDataService::submitAssignment($id, $assignmentId, $userEmail, $fileName);
+        abort_unless($user->role === 'mahasiswa', 403);
 
-        return redirect('/courses/' . $id . '/assignments')->with('success', 'Tugas berhasil dikumpulkan tepat waktu.');
+        $class = CourseClass::with('course')->findOrFail($id);
+        $this->assertCanAccessClass($class);
+        $assignment = Assignment::where('course_class_id', $class->id)->findOrFail($assignmentId);
+        $data = $request->validate([
+            'file_name' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $fileName = 'submissions/'.$data['file_name'];
+
+        AssignmentSubmission::updateOrCreate(
+            [
+                'assignment_id' => $assignmentId,
+                'student_id' => $user->id,
+            ],
+            [
+                'file_path' => $fileName,
+                'updated_at' => now(),
+            ]
+        );
+
+        // Notify lecturer about the submission
+        if ($class->lecturer_id) {
+            NotificationController::createNotification(
+                $class->lecturer_id,
+                'Pengumpulan Tugas: '.$assignment->title,
+                "Mahasiswa {$user->name} telah mengumpulkan tugas untuk kelas ".$class->name.'.',
+                'submission_new',
+                '/courses/'.$id.'/assignments'
+            );
+        }
+
+        return redirect('/courses/'.$id.'/assignments')->with('success', 'Tugas Anda berhasil dikumpulkan.');
     }
 
     /**
-     * Full weekly schedule page.
+     * Show full academic schedule.
      */
     public function schedule(Request $request)
     {
-        $schedules = MockDataService::getWeeklySchedules();
+        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
         $selectedDay = $request->query('day', 'Senin');
+        if (! in_array($selectedDay, $days, true)) {
+            $selectedDay = 'Senin';
+        }
+
+        $user = Auth::user();
+        $scheduleQuery = Schedule::with(['courseClass.course', 'courseClass.lecturer', 'room.building']);
+
+        if ($user->role === 'mahasiswa') {
+            $scheduleQuery->whereHas('courseClass', fn ($query) => $query->where('cohort_id', $user->cohort_id));
+        } elseif ($user->role === 'dosen') {
+            $scheduleQuery->whereHas('courseClass', fn ($query) => $query->where('lecturer_id', $user->id));
+        }
+
+        if ($user->role === 'mahasiswa' && $user->cohort_id === null) {
+            $scheduleQuery->whereRaw('1 = 0');
+        }
+
+        $allSchedules = $scheduleQuery->get();
+        $schedules = [];
+
+        foreach ($days as $day) {
+            $schedules[$day] = $allSchedules->where('day', $day)->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'code' => $s->courseClass?->course?->code ?? 'MK',
+                    'course' => $s->courseClass?->course?->name ?? 'Mata Kuliah',
+                    'lecturer' => $s->courseClass?->lecturer?->name ?? 'Dosen',
+                    'class' => $s->courseClass?->name ?? 'Kelas',
+                    'time' => substr($s->start_time, 0, 5).' - '.substr($s->end_time, 0, 5),
+                    'room' => ($s->room?->name ?? 'Ruangan').' ('.($s->room?->code ?? '').')',
+                    'mode' => strtoupper($s->mode),
+                ];
+            })->values()->toArray();
+        }
 
         return view('academic.schedule', compact('schedules', 'selectedDay'));
     }

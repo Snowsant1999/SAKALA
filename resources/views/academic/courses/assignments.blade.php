@@ -23,7 +23,7 @@
                 <h1 class="text-2xl font-extrabold">{{ $course['name'] }}</h1>
             </div>
 
-            @if(session('user_role') === 'lecturer' || session('user_role') === 'admin')
+            @if(session('user_role') === 'dosen' || session('user_role') === 'admin')
                 <button onclick="document.getElementById('add-assignment-modal').classList.remove('hidden')" class="btn bg-white text-navy-700 hover:bg-slate-100 shadow-md font-semibold">
                     <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     Terbitkan Tugas Baru
@@ -57,8 +57,8 @@
     <div class="space-y-4">
         @forelse($assignments as $a)
             @php
-                $submission = $a['submissions'][$userEmail] ?? null;
-                $isSubmitted = $submission && ($submission['status'] === 'SUBMITTED');
+                $submission = $a['submission'] ?? null;
+                $isSubmitted = $a['is_submitted'];
             @endphp
             <div class="card p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:shadow-md transition-all border-l-4 {{ $isSubmitted ? 'border-l-emerald-500' : 'border-l-amber-500' }}">
                 <div class="flex items-start gap-4 flex-1">
@@ -69,6 +69,8 @@
                         <div class="flex items-center gap-2 mb-1">
                             @if($isSubmitted)
                                 <span class="badge badge-success text-[11px]">✓ Terkumpul</span>
+                            @elseif($a['late'] ?? false)
+                                <span class="badge badge-danger text-[11px]">Terlambat</span>
                             @else
                                 <span class="badge badge-warning text-[11px]">⏳ Belum Dikerjakan</span>
                             @endif

@@ -9,20 +9,20 @@
     <div class="card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
             <div class="relative w-full sm:w-64">
-                <input type="text" placeholder="Cari ruangan..." class="form-input text-xs pl-9">
+                <input id="roomSearch" type="text" placeholder="Cari ruangan..." class="form-input text-xs pl-9">
                 <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
             </div>
-            <select class="form-input text-xs">
+            <select id="roomTypeFilter" class="form-input text-xs">
                 <option value="">Semua Tipe</option>
                 <option>Kelas</option>
                 <option>Laboratorium</option>
                 <option>Aula</option>
             </select>
         </div>
-        <button onclick="showToast('Fitur tambah ruangan (Master Data)', 'info')" class="btn btn-primary text-xs shrink-0">
+        <a href="{{ url('/admin/rooms/create') }}" class="btn btn-primary text-xs shrink-0">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Tambah Ruangan
-        </button>
+        </a>
     </div>
 
     {{-- Room Stats Summary --}}
@@ -75,7 +75,7 @@
                             ];
                             $badgeClass = $statusColors[$r['status']] ?? 'badge-info';
                         @endphp
-                        <tr>
+                        <tr data-room-row data-room-type="{{ $r['type'] }}">
                             <td class="font-mono font-bold text-xs text-navy-700">{{ $r['code'] }}</td>
                             <td class="font-bold text-xs text-slate-800">{{ $r['name'] }}</td>
                             <td class="text-xs text-slate-600">{{ $r['building'] }}</td>
@@ -90,8 +90,12 @@
                             <td><span class="badge {{ $badgeClass }} text-[10px]">{{ $r['status'] }}</span></td>
                             <td class="text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button onclick="showToast('Detail {{ $r['name'] }}', 'info')" class="text-navy-600 hover:text-navy-800 text-xs font-semibold">Detail</button>
-                                    <button onclick="showToast('Edit {{ $r['name'] }}', 'info')" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</button>
+                                    <a href="{{ url('/admin/rooms/'.$r['id'].'/edit') }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</a>
+                                    <form method="POST" action="{{ url('/admin/rooms/'.$r['id']) }}" onsubmit="return confirm('Hapus ruangan ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -101,4 +105,25 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    const roomSearch = document.getElementById('roomSearch');
+    const roomTypeFilter = document.getElementById('roomTypeFilter');
+    const roomRows = document.querySelectorAll('[data-room-row]');
+
+    function filterRooms() {
+        const query = roomSearch.value.trim().toLocaleLowerCase();
+        const type = roomTypeFilter.value.toLocaleLowerCase();
+        roomRows.forEach((row) => {
+            const matchesText = row.textContent.toLocaleLowerCase().includes(query);
+            const matchesType = !type || row.dataset.roomType.toLocaleLowerCase() === type;
+            row.hidden = !(matchesText && matchesType);
+        });
+    }
+
+    roomSearch.addEventListener('input', filterRooms);
+    roomTypeFilter.addEventListener('change', filterRooms);
+</script>
 @endsection

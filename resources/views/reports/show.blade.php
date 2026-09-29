@@ -32,6 +32,8 @@
                     <span class="badge badge-info text-sm py-1">⚙ Sedang Ditangani Satgas (IN PROGRESS)</span>
                 @elseif($report['status'] === 'UNDER_REVIEW')
                     <span class="badge badge-warning text-sm py-1">🔍 Dalam Telaah Satgas (UNDER REVIEW)</span>
+                @elseif($report['status'] === 'REJECTED')
+                    <span class="badge badge-danger text-sm py-1">Laporan Diarsipkan (REJECTED)</span>
                 @else
                     <span class="badge bg-purple-50 text-purple-700 text-sm py-1 font-semibold">📩 Laporan Terkirim (SUBMITTED)</span>
                 @endif
@@ -73,8 +75,8 @@
                             <div class="font-medium text-slate-700">{{ $report['reporter_role'] }} ({{ $report['reporter_nim'] ?? '-' }})</div>
                         </div>
                         <div>
-                            <span class="text-slate-400">Opsi Privasi:</span>
-                            <div class="font-semibold text-slate-700">{{ ($report['is_anonymous'] ?? false) ? '🛡️ Anonim bagi Publik' : '👤 Terbuka' }}</div>
+                            <span class="text-slate-400">Privasi Identitas:</span>
+                            <div class="font-semibold text-slate-700">Nama lengkap hanya ditampilkan kepada admin SAKALA.</div>
                         </div>
                         <div>
                             <span class="text-slate-400">Waktu Dibuat:</span>
@@ -116,7 +118,9 @@
                     <div class="text-xs text-slate-400 mb-1">Bukti Lampiran:</div>
                     <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center justify-between">
                         <span>📎 {{ $report['attachments'] ?? 'Tidak ada lampiran' }}</span>
-                        <button onclick="showToast('Mengunduh lampiran bukti')" class="text-navy-600 font-semibold hover:underline">Unduh</button>
+                        @if($report['has_attachment'])
+                            <a href="{{ url('/reports/'.$report['raw_id'].'/attachment') }}" class="text-navy-600 font-semibold hover:underline">Unduh</a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -181,6 +185,7 @@
                     <option value="UNDER_REVIEW" {{ $report['status'] === 'UNDER_REVIEW' ? 'selected' : '' }}>UNDER REVIEW (Dalam Telaah Satgas)</option>
                     <option value="IN_PROGRESS" {{ $report['status'] === 'IN_PROGRESS' ? 'selected' : '' }}>IN PROGRESS (Sedang Ditindaklanjuti)</option>
                     <option value="RESOLVED" {{ $report['status'] === 'RESOLVED' ? 'selected' : '' }}>RESOLVED (Selesai Ditangani)</option>
+                    <option value="REJECTED" {{ $report['status'] === 'REJECTED' ? 'selected' : '' }}>REJECTED (Diarsipkan)</option>
                 </select>
             </div>
 

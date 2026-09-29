@@ -11,10 +11,10 @@
             <h2 class="text-sm font-bold text-slate-800">Gedung Kampus</h2>
             <p class="text-xs text-slate-500 mt-1">Manajemen gedung dan fasilitas Politeknik Negeri Samarinda</p>
         </div>
-        <button onclick="showToast('Fitur tambah gedung (Master Data)', 'info')" class="btn btn-primary text-xs shrink-0">
+        <a href="{{ url('/admin/buildings/create') }}" class="btn btn-primary text-xs shrink-0">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
             Tambah Gedung
-        </button>
+        </a>
     </div>
 
     {{-- Buildings Grid --}}
@@ -47,8 +47,13 @@
 
                 {{-- Actions --}}
                 <div class="px-5 pb-4 flex justify-end gap-2">
-                    <button onclick="showToast('Detail {{ $b['name'] }}', 'info')" class="text-xs font-semibold text-navy-600 hover:text-navy-800">Detail</button>
-                    <button onclick="showToast('Edit {{ $b['name'] }}', 'info')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Edit</button>
+                    <a href="{{ url('/admin/floors?building_id='.$b['id']) }}" class="text-xs font-semibold text-navy-600 hover:text-navy-800">Lantai</a>
+                    <a href="{{ url('/admin/buildings/'.$b['id'].'/edit') }}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800">Edit</a>
+                    <form method="POST" action="{{ url('/admin/buildings/'.$b['id']) }}" onsubmit="return confirm('Hapus gedung ini?')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="text-xs font-semibold text-red-600 hover:text-red-800">Hapus</button>
+                    </form>
                 </div>
             </div>
         @endforeach

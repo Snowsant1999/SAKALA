@@ -9,7 +9,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="m-0 p-0 antialiased font-sans">
-    <div class="login-bg min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6">
+    <div class="login-bg min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6" style="background-image: url({{ asset('storage/images.jpg') }})">
         @yield('content')
     </div>
 

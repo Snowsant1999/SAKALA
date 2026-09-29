@@ -8,6 +8,7 @@
 @endsection
 
 @section('content')
+<div data-dashboard-live>
 <div class="mb-6 animate-fade-in-up">
     <h2 class="text-2xl font-bold text-slate-800">Halo, {{ session('user_name', 'Mahasiswa') }}! 👋</h2>
     <p class="text-slate-500 mt-1">Berikut adalah ringkasan aktivitas akademik Anda hari ini.</p>
@@ -154,5 +155,6 @@
         </div>
 
     </div>
+</div>
 </div>
 @endsection

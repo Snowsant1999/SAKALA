@@ -2,120 +2,240 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Building;
+use App\Models\Room;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class RoomController extends Controller
 {
-    /**
-     * Mock data for buildings, floors, and rooms.
-     */
-    private array $mockBuildings = [
-        ['id' => 'bld-01', 'name' => 'Gedung Teknologi Informasi'],
-        ['id' => 'bld-02', 'name' => 'Gedung Teknik Elektro'],
-    ];
-
-    private array $mockFloors = [
-        'bld-01' => [
-            ['id' => 'flr-01-1', 'level' => 1, 'label' => 'Lantai 1'],
-            ['id' => 'flr-01-2', 'level' => 2, 'label' => 'Lantai 2'],
-            ['id' => 'flr-01-3', 'level' => 3, 'label' => 'Lantai 3'],
-            ['id' => 'flr-01-4', 'level' => 4, 'label' => 'Lantai 4'],
-        ],
-        'bld-02' => [
-            ['id' => 'flr-02-1', 'level' => 1, 'label' => 'Lantai 1'],
-            ['id' => 'flr-02-2', 'level' => 2, 'label' => 'Lantai 2'],
-        ]
-    ];
-
-    private array $mockRooms = [
-        // Gedung TI, Lantai 1
-        ['id' => 'rm-001', 'code' => 'TI-101', 'name' => 'Kelas 1', 'floorId' => 'flr-01-1', 'capacity' => 30, 'type' => 'Kelas', 'status' => 'DIGUNAKAN'],
-        ['id' => 'rm-002', 'code' => 'TI-102', 'name' => 'Lab Multimedia', 'floorId' => 'flr-01-1', 'capacity' => 30, 'type' => 'Laboratorium', 'status' => 'KOSONG'],
-        // Gedung TI, Lantai 2
-        ['id' => 'rm-003', 'code' => 'TI-201', 'name' => 'Kelas 2A', 'floorId' => 'flr-01-2', 'capacity' => 40, 'type' => 'Kelas', 'status' => 'DIGUNAKAN'],
-        ['id' => 'rm-004', 'code' => 'TI-202', 'name' => 'Lab Rekayasa Komputer', 'floorId' => 'flr-01-2', 'capacity' => 25, 'type' => 'Laboratorium', 'status' => 'RESERVED'],
-        ['id' => 'rm-005', 'code' => 'TI-203', 'name' => 'Kelas 2B', 'floorId' => 'flr-01-2', 'capacity' => 30, 'type' => 'Kelas', 'status' => 'KOSONG'],
-        // Gedung TI, Lantai 3
-        ['id' => 'rm-006', 'code' => 'TI-301', 'name' => 'Aula Gedung TI', 'floorId' => 'flr-01-3', 'capacity' => 100, 'type' => 'Aula', 'status' => 'MAINTENANCE'],
-        // Gedung Elektro, Lantai 1
-        ['id' => 'rm-007', 'code' => 'TE-101', 'name' => 'Lab Kendali', 'floorId' => 'flr-02-1', 'capacity' => 20, 'type' => 'Laboratorium', 'status' => 'KOSONG'],
-        ['id' => 'rm-008', 'code' => 'TE-102', 'name' => 'Kelas TE-1', 'floorId' => 'flr-02-1', 'capacity' => 30, 'type' => 'Kelas', 'status' => 'KOSONG'],
+    private const AVAILABLE_WINDOWS = [
+        ['start' => '08:00', 'end' => '10:00'],
+        ['start' => '10:00', 'end' => '12:00'],
+        ['start' => '13:00', 'end' => '15:00'],
+        ['start' => '15:00', 'end' => '17:00'],
     ];
 
     /**
-     * Display the room exploration view (Left wireframe).
+     * Display the room exploration view.
      */
     public function index(Request $request)
     {
-        $buildings = $this->mockBuildings;
-        
-        // Handle filter state
-        $selectedBuildingId = $request->query('building_id', $buildings[0]['id']);
-        $floors = $this->mockFloors[$selectedBuildingId] ?? [];
-        $selectedFloorId = $request->query('floor_id', $floors[0]['id'] ?? null);
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
+        ]);
+        $selectedDate = Carbon::parse($validated['date'] ?? today()->toDateString());
 
-        // Filter rooms based on selected floor
-        $rooms = array_filter($this->mockRooms, function($room) use ($selectedFloorId) {
-            return $room['floorId'] == $selectedFloorId;
-        });
+        $buildings = Building::with('rooms')->get();
+        $selectedBuildingId = $request->query('building_id', $buildings->first()->id ?? null);
 
-        // Search query
+        $floors = [
+            ['id' => 'all', 'label' => 'Semua Lantai'],
+            ['id' => '1', 'label' => 'Lantai 1'],
+            ['id' => '2', 'label' => 'Lantai 2'],
+            ['id' => '3', 'label' => 'Lantai 3'],
+            ['id' => '4', 'label' => 'Lantai 4'],
+        ];
+        $selectedFloorId = $request->query('floor_id', 'all');
+
+        $query = Room::query();
+        if ($selectedBuildingId) {
+            $query->where('building_id', $selectedBuildingId);
+        }
+
+        if ($selectedFloorId && $selectedFloorId !== 'all') {
+            $query->where('floor', (int) $selectedFloorId);
+        }
+
         $searchQuery = $request->query('q', '');
-        if (!empty($searchQuery)) {
-            $rooms = array_filter($rooms, function($room) use ($searchQuery) {
-                return stripos($room['name'], $searchQuery) !== false || stripos($room['code'], $searchQuery) !== false;
+        if (! empty($searchQuery)) {
+            $query->where(function ($q) use ($searchQuery) {
+                $q->where('name', 'like', "%{$searchQuery}%")
+                    ->orWhere('code', 'like', "%{$searchQuery}%");
             });
         }
 
-        return view('rooms.index', compact('buildings', 'floors', 'rooms', 'selectedBuildingId', 'selectedFloorId', 'searchQuery'));
+        $rooms = $this->availabilityQuery($query, $selectedDate)
+            ->get()
+            ->map(function (Room $room) use ($selectedDate) {
+                $availability = $this->buildAvailability($room);
+
+                return [
+                    'id' => $room->id,
+                    'code' => $room->code,
+                    'name' => $room->name,
+                    'capacity' => $room->capacity,
+                    'type' => $room->type,
+                    'status' => $availability['roomStatus'],
+                    'availableCount' => $availability['availableCount'],
+                    'floorId' => (string) ($room->floor ?? 1),
+                    'floor' => 'Lantai '.($room->floor ?? 1),
+                    'date' => $selectedDate->toDateString(),
+                ];
+            });
+
+        return view('rooms.index', [
+            'buildings' => $buildings->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'floors' => $floors,
+            'rooms' => $rooms,
+            'selectedBuildingId' => $selectedBuildingId,
+            'selectedFloorId' => $selectedFloorId,
+            'searchQuery' => $searchQuery,
+            'selectedDate' => $selectedDate->toDateString(),
+        ]);
     }
 
     /**
-     * Display a specific room and its daily schedule (Right wireframe).
+     * Display a specific room and its daily schedule.
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
-        // Find room
-        $room = collect($this->mockRooms)->firstWhere('id', $id);
-        
-        if (!$room) {
-            abort(404, 'Ruangan tidak ditemukan');
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
+        ]);
+        $selectedDate = Carbon::parse($validated['date'] ?? today()->toDateString());
+        $room = $this->availabilityQuery(Room::query()->with('building'), $selectedDate)
+            ->findOrFail($id);
+        $availability = $this->buildAvailability($room);
+
+        $roomData = [
+            'id' => $room->id,
+            'code' => $room->code,
+            'name' => $room->name,
+            'capacity' => $room->capacity,
+            'type' => $room->type,
+            'status' => $availability['roomStatus'],
+            'buildingName' => $room->building->name ?? 'Gedung TI',
+            'floorLabel' => 'Lantai '.($room->floor ?? 1),
+            'floorId' => (string) ($room->floor ?? 1),
+        ];
+
+        return view('rooms.show', [
+            'room' => $roomData,
+            'schedules' => $availability['schedules'],
+            'selectedDate' => $selectedDate->toDateString(),
+        ]);
+    }
+
+    private function availabilityQuery(Builder $query, Carbon $selectedDate): Builder
+    {
+        $day = $selectedDate->locale('id')->isoFormat('dddd');
+
+        return $query->with([
+            'schedules' => fn ($scheduleQuery) => $scheduleQuery
+                ->where('day', $day)
+                ->with([
+                    'courseClass.course',
+                    'courseClass.lecturer',
+                    'exceptions' => fn ($exceptionQuery) => $exceptionQuery
+                        ->whereDate('date', $selectedDate->toDateString()),
+                ]),
+            'reservations' => fn ($reservationQuery) => $reservationQuery
+                ->whereDate('date', $selectedDate->toDateString())
+                ->where('status', 'approved')
+                ->with(['user', 'courseClass.cohort.studyProgram']),
+        ]);
+    }
+
+    private function buildAvailability(Room $room): array
+    {
+        $events = [];
+
+        foreach ($room->schedules as $schedule) {
+            if (in_array(strtoupper($schedule->mode), ['ONLINE', 'CANCELLED'], true)) {
+                continue;
+            }
+
+            $exception = $schedule->exceptions->first();
+            $courseName = $schedule->courseClass?->course?->name ?? 'Mata Kuliah';
+            $user = auth()->user();
+            $canManageException = $user && (
+                $user->role === 'admin'
+                || ($user->role === 'dosen' && (int) $schedule->courseClass?->lecturer_id === (int) $user->id)
+            );
+
+            $events[] = [
+                'start' => substr($schedule->start_time, 0, 5),
+                'end' => substr($schedule->end_time, 0, 5),
+                'status' => $exception ? 'AVAILABLE' : 'OCCUPIED',
+                'course' => $exception ? 'Sesi dibatalkan: '.$courseName : $courseName,
+                'lecturer' => $schedule->courseClass?->lecturer?->name ?? '-',
+                'program' => 'TI',
+                'class' => $schedule->courseClass?->name ?? '5A',
+                'scheduleId' => $schedule->id,
+                'exceptionId' => $exception?->id,
+                'exceptionReason' => $exception?->reason,
+                'canManageException' => $canManageException,
+            ];
         }
 
-        // Add extra details for the show view
-        $room['buildingName'] = collect($this->mockBuildings)->firstWhere('id', collect($this->mockFloors)->flatMap(function ($floors, $bId) use ($room) {
-            return collect($floors)->firstWhere('id', $room['floorId']) ? [$bId] : [];
-        })->first())['name'] ?? 'Unknown Building';
-        
-        $room['floorLabel'] = collect($this->mockFloors)->flatten(1)->firstWhere('id', $room['floorId'])['label'] ?? 'Unknown Floor';
+        foreach ($room->reservations as $reservation) {
+            $events[] = [
+                'start' => substr($reservation->start_time, 0, 5),
+                'end' => substr($reservation->end_time, 0, 5),
+                'status' => 'RESERVED_SLOT',
+                'course' => 'Reservasi: '.$reservation->purpose,
+                'lecturer' => $reservation->user?->name ?? 'User',
+                'program' => $reservation->courseClass?->cohort?->studyProgram?->name ?? 'Tidak terkait prodi',
+                'class' => $reservation->courseClass?->name ?? 'Tidak terkait kelas',
+                'scheduleId' => null,
+                'exceptionId' => null,
+                'exceptionReason' => null,
+                'canManageException' => false,
+            ];
+        }
 
-        // Mock schedule for this specific room today
+        $boundaries = ['08:00', '10:00', '12:00', '13:00', '15:00', '17:00'];
+        foreach ($events as $event) {
+            $boundaries[] = $event['start'];
+            $boundaries[] = $event['end'];
+        }
+        $boundaries = array_values(array_unique($boundaries));
+        sort($boundaries);
+
         $schedules = [];
-        
-        if ($room['status'] == 'DIGUNAKAN') {
-            $schedules = [
-                ['time' => '09:00 - 12:00', 'course' => 'Blockchain', 'lecturer' => 'Sufarman', 'program' => 'TRK', 'class' => '5A', 'status' => 'OCCUPIED'],
-                ['time' => '13:00 - 15:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-                ['time' => '15:00 - 17:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-            ];
-        } elseif ($room['status'] == 'RESERVED') {
-            $schedules = [
-                ['time' => '08:00 - 10:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-                ['time' => '13:00 - 15:00', 'course' => 'Reservasi: Praktikum Jaringan', 'lecturer' => 'Andi Pratama (Mhs)', 'program' => 'TRK', 'class' => '5A', 'status' => 'RESERVED_SLOT'],
-                ['time' => '15:00 - 17:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-            ];
-        } elseif ($room['status'] == 'MAINTENANCE') {
-             $schedules = [
-                ['time' => '08:00 - 17:00', 'course' => 'Maintenance Rutin', 'status' => 'MAINTENANCE_SLOT'],
-            ];
-        } else {
-             $schedules = [
-                ['time' => '08:00 - 10:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-                ['time' => '10:00 - 12:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
-                ['time' => '13:00 - 15:00', 'course' => 'Available Slot', 'status' => 'AVAILABLE'],
+        for ($index = 0; $index < count($boundaries) - 1; $index++) {
+            $start = $boundaries[$index];
+            $end = $boundaries[$index + 1];
+            $matchingEvents = collect($events)->filter(
+                fn (array $event): bool => $event['start'] <= $start && $event['end'] >= $end,
+            );
+            $matchingEvent = $matchingEvents->first(fn (array $event): bool => $event['status'] !== 'AVAILABLE')
+                ?? $matchingEvents->first();
+            $isAvailableWindow = collect(self::AVAILABLE_WINDOWS)->contains(
+                fn (array $window): bool => $window['start'] <= $start && $window['end'] >= $end,
+            );
+
+            if (! $matchingEvent && ! $isAvailableWindow) {
+                continue;
+            }
+
+            $schedules[] = [
+                'time' => $start.' - '.$end,
+                'course' => $matchingEvent['course'] ?? 'Slot tersedia',
+                'lecturer' => $matchingEvent['lecturer'] ?? '-',
+                'program' => $matchingEvent['program'] ?? '-',
+                'class' => $matchingEvent['class'] ?? '',
+                'status' => $matchingEvent['status'] ?? 'AVAILABLE',
+                'scheduleId' => $matchingEvent['scheduleId'] ?? null,
+                'exceptionId' => $matchingEvent['exceptionId'] ?? null,
+                'exceptionReason' => $matchingEvent['exceptionReason'] ?? null,
+                'canManageException' => $matchingEvent['canManageException'] ?? false,
             ];
         }
 
-        return view('rooms.show', compact('room', 'schedules'));
+        $availableCount = collect($schedules)->where('status', 'AVAILABLE')->count();
+        $hasReservation = collect($schedules)->contains('status', 'RESERVED_SLOT');
+        $hasClass = collect($schedules)->contains('status', 'OCCUPIED');
+        $roomStatus = $availableCount > 0
+            ? 'KOSONG'
+            : ($hasReservation ? 'RESERVED' : ($hasClass ? 'PENUH' : 'KOSONG'));
+
+        return [
+            'roomStatus' => $roomStatus,
+            'availableCount' => $availableCount,
+            'schedules' => $schedules,
+        ];
     }
 }

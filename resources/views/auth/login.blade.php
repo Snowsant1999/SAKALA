@@ -18,10 +18,20 @@
         <h2 class="text-xl font-bold text-slate-800 mb-1">Selamat Datang</h2>
         <p class="text-sm text-slate-500 mb-6">Masuk ke akun Anda untuk melanjutkan</p>
 
-        {{-- Error Message --}}
+        {{-- Error & Success Message --}}
         @if(session('error'))
             <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
                 {{ session('error') }}
+            </div>
+        @endif
+        @if($errors->any())
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+                {{ $errors->first() }}
+            </div>
+        @endif
+        @if(session('success'))
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm mb-4">
+                {{ session('success') }}
             </div>
         @endif
 
@@ -34,7 +44,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label" for="password">Password</label>
-                <input type="password" name="password" id="password" class="form-input" placeholder="Masukkan password" required value="password">
+                <input type="password" name="password" id="password" class="form-input" placeholder="Masukkan password" required>
             </div>
             <button type="submit" class="btn btn-primary w-full mt-2">
                 <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" /></svg>
@@ -51,29 +61,29 @@
 
         {{-- Demo Account Cards --}}
         <div class="space-y-2">
-            <div class="demo-account-card" onclick="fillAccount('student@sakala.test', 'Andi Pratama', 'student')">
-                <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-sm shrink-0">AP</div>
+            <div class="demo-account-card" onclick="fillAccount('mahasiswa@sakala.com', 'Haikal', 'mahasiswa')">
+                <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-semibold text-sm shrink-0">H</div>
                 <div class="flex-1">
-                    <div class="text-sm font-semibold text-slate-800">Andi Pratama</div>
-                    <div class="text-xs text-slate-500">student@sakala.test</div>
+                    <div class="text-sm font-semibold text-slate-800">Haikal</div>
+                    <div class="text-xs text-slate-500">mahasiswa@sakala.com</div>
                 </div>
                 <span class="badge badge-success">Mahasiswa</span>
             </div>
 
-            <div class="demo-account-card" onclick="fillAccount('lecturer@sakala.test', 'Dr. Budi Santoso', 'lecturer')">
+            <div class="demo-account-card" onclick="fillAccount('dosen@sakala.com', 'Dr. Budi Santoso, M.Kom', 'dosen')">
                 <div class="w-10 h-10 rounded-full bg-sky-100 flex items-center justify-center text-sky-700 font-semibold text-sm shrink-0">BS</div>
                 <div class="flex-1">
-                    <div class="text-sm font-semibold text-slate-800">Dr. Budi Santoso</div>
-                    <div class="text-xs text-slate-500">lecturer@sakala.test</div>
+                    <div class="text-sm font-semibold text-slate-800">Dr. Budi Santoso, M.Kom</div>
+                    <div class="text-xs text-slate-500">dosen@sakala.com</div>
                 </div>
                 <span class="badge badge-info">Dosen</span>
             </div>
 
-            <div class="demo-account-card" onclick="fillAccount('admin@sakala.test', 'Admin SAKALA', 'admin')">
+            <div class="demo-account-card" onclick="fillAccount('admin@sakala.com', 'Admin SAKALA', 'admin')">
                 <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm shrink-0">AS</div>
                 <div class="flex-1">
                     <div class="text-sm font-semibold text-slate-800">Admin SAKALA</div>
-                    <div class="text-xs text-slate-500">admin@sakala.test</div>
+                    <div class="text-xs text-slate-500">admin@sakala.com</div>
                 </div>
                 <span class="badge badge-primary">Admin</span>
             </div>

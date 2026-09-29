@@ -8,10 +8,11 @@
 @endsection
 
 @section('content')
+<div data-dashboard-live>
 {{-- Stats Cards --}}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     @foreach($stats as $stat)
-    <div class="stat-card">
+    <a href="{{ url($stat['url']) }}" class="stat-card transition-shadow hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600">
         <div class="stat-icon" style="background: {{ $stat['color'] }}">
             @if($stat['icon'] == 'academic')
                 <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10v6M2 10l10-5 10 5-10 5z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5" /></svg>
@@ -35,7 +36,7 @@
             <div class="stat-value">{{ $stat['value'] }}</div>
             <div class="stat-label">{{ $stat['label'] }}</div>
         </div>
-    </div>
+    </a>
     @endforeach
 </div>
 
@@ -49,14 +50,21 @@
         <div class="card-body">
             
             {{-- Conflict Indicator --}}
+            @if($conflictCount > 0)
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-3">
                 <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2.25m0 2.25h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3Z" /></svg>
                 <div>
-                    <h4 class="text-sm font-semibold text-amber-800">1 Konflik Terdeteksi</h4>
-                    <p class="text-xs text-amber-700 mt-0.5">Terdapat 2 request untuk ruangan dan waktu yang sama. Membutuhkan keputusan Anda.</p>
+                    <h4 class="text-sm font-semibold text-amber-800">{{ $conflictCount }} Konflik Terdeteksi</h4>
+                    <p class="text-xs text-amber-700 mt-0.5">Pengajuan reservasi bertumpang tindih dan membutuhkan keputusan Anda.</p>
                 </div>
-                <a href="{{ url('/admin/reservations') }}" class="ml-auto btn btn-sm bg-amber-100 text-amber-700 hover:bg-amber-200 border-0">Review</a>
+                <a href="{{ url('/admin/reservations?tab=conflicts') }}" class="ml-auto btn btn-sm bg-amber-100 text-amber-700 hover:bg-amber-200 border-0">Review</a>
             </div>
+            @else
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mb-4 flex items-center gap-3 text-sm text-emerald-800">
+                <svg class="w-5 h-5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9 12.75 2.25 2.25L15 9.75m6 2.25a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                <span>Tidak ada konflik reservasi aktif.</span>
+            </div>
+            @endif
 
             <div class="overflow-x-auto">
                 <table class="data-table">
@@ -69,7 +77,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($pendingReservations as $rsv)
+                        @forelse($pendingReservations as $rsv)
                         <tr class="{{ $loop->index < 2 ? 'bg-amber-50/30' : '' }}">
                             <td>
                                 <div class="font-medium text-slate-800">{{ $rsv['requester'] }}</div>
@@ -86,7 +94,9 @@
                                 <a href="{{ url('/reservations/' . ($rsv['id'] ?? 'rsv-001')) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Detail</a>
                             </td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr><td colspan="4" class="py-6 text-center text-xs text-slate-500">Tidak ada reservasi yang menunggu persetujuan.</td></tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -112,9 +122,9 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($recentReports as $report)
+                        @forelse($recentReports as $report)
                         <tr>
-                            <td class="font-medium text-slate-600 text-xs">#{{ explode('-', $report['id'])[1] }}</td>
+                            <td class="font-medium text-slate-600 text-xs">{{ $report['id'] }}</td>
                             <td>
                                 <div class="font-medium text-slate-800">{{ $report['category'] }}</div>
                                 <div class="text-xs text-slate-500">{{ \Carbon\Carbon::parse($report['date'])->translatedFormat('d F Y') }}</div>
@@ -124,28 +134,37 @@
                                     <span class="badge badge-gray text-[10px]">Submitted</span>
                                 @elseif($report['status'] == 'UNDER_REVIEW')
                                     <span class="badge badge-info text-[10px]">Under Review</span>
+                                @elseif($report['status'] === 'RESOLVED')
+                                    <span class="badge badge-success text-[10px]">Resolved</span>
+                                @elseif($report['status'] === 'REJECTED')
+                                    <span class="badge badge-danger text-[10px]">Rejected</span>
                                 @else
                                     <span class="badge badge-primary text-[10px]">{{ str_replace('_', ' ', $report['status']) }}</span>
                                 @endif
                             </td>
                             <td>
-                                @if($report['priority'] == 'HIGH')
+                                @if($report['priority'] === 'URGENT')
+                                    <span class="badge badge-danger text-[10px]">Urgent</span>
+                                @elseif($report['priority'] === 'HIGH')
                                     <span class="badge badge-warning text-[10px]">High</span>
                                 @elseif($report['priority'] == 'MEDIUM')
-                                    <span class="badge badge-primary text-[10px]">Medium</span>
+                                    <span class="badge badge-info text-[10px]">Medium</span>
                                 @else
                                     <span class="badge badge-gray text-[10px]">Low</span>
                                 @endif
                             </td>
                             <td class="text-right">
-                                <a href="{{ url('/reports/' . $report['id']) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Detail</a>
+                                <a href="{{ url('/reports/' . $report['raw_id']) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Detail</a>
                             </td>
                         </tr>
-                        @endforeach
+                        @empty
+                        <tr><td colspan="5" class="py-6 text-center text-xs text-slate-500">Belum ada laporan Kampus Aman.</td></tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
+</div>
 </div>
 @endsection
