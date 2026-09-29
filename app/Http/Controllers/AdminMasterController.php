@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Building;
+use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\Department;
 use App\Models\Floor;
-use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\StudyProgram;
@@ -66,7 +66,7 @@ class AdminMasterController extends Controller
     public function students()
     {
         $students = User::where('role', 'mahasiswa')
-            ->with(['studyProgram', 'department', 'courseClasses'])
+            ->with(['studyProgram', 'department', 'cohort'])
             ->get()
             ->map(function ($u) {
                 return [
@@ -75,7 +75,7 @@ class AdminMasterController extends Controller
                     'nim' => $u->nim_nip ?? '2105123456',
                     'email' => $u->email,
                     'program' => $u->studyProgram?->name ?? ($u->department?->name ?? 'Belum ditentukan'),
-                    'class' => $u->courseClasses->pluck('name')->join(', ') ?: 'Belum ditetapkan',
+                    'class' => $u->cohort?->name ?? 'Belum ditetapkan',
                     'semester' => $u->semester ?? '—',
                     'ipk' => $u->ipk ?? '—',
                     'status' => $u->status === 'active' ? 'Aktif' : 'Nonaktif',
@@ -165,14 +165,16 @@ class AdminMasterController extends Controller
 
     public function classes()
     {
-        $classes = CourseClass::with(['course.studyProgram', 'lecturer'])
+        $classes = CourseClass::with(['course.studyProgram', 'lecturer', 'cohort'])
             ->withCount('students')
             ->get()
             ->map(function ($cls) {
                 return [
                     'id' => $cls->id,
                     'name' => $cls->name,
-                    'program' => $cls->course?->studyProgram?->name ?? 'Belum ditautkan',
+                    'course' => $cls->course?->name ?? 'Mata Kuliah',
+                    'cohort' => $cls->cohort?->name ?? 'Belum ditautkan',
+                    'program' => $cls->cohort?->studyProgram?->name ?? $cls->course?->studyProgram?->name ?? 'Belum ditautkan',
                     'academic_year' => $cls->academic_year ?? 'Belum ditentukan',
                     'homeroom' => $cls->lecturer?->name ?? 'Belum ditetapkan',
                     'total_students' => $cls->students_count,
@@ -180,6 +182,23 @@ class AdminMasterController extends Controller
             });
 
         return view('admin.master.classes', compact('classes'));
+    }
+
+    public function cohorts()
+    {
+        $cohorts = Cohort::with('studyProgram')
+            ->withCount(['students', 'courseClasses'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Cohort $cohort): array => [
+                'id' => $cohort->id,
+                'name' => $cohort->name,
+                'program' => $cohort->studyProgram?->name ?? 'Belum ditentukan',
+                'students_count' => $cohort->students_count,
+                'classes_count' => $cohort->course_classes_count,
+            ]);
+
+        return view('admin.master.cohorts', compact('cohorts'));
     }
 
     public function buildings()
@@ -273,7 +292,7 @@ class AdminMasterController extends Controller
             $schedules[$day] = ($grouped->get($day, collect()))->map(function ($s) {
                 return [
                     'id' => $s->id,
-                    'time' => substr($s->start_time, 0, 5) . ' - ' . substr($s->end_time, 0, 5),
+                    'time' => substr($s->start_time, 0, 5).' - '.substr($s->end_time, 0, 5),
                     'course' => $s->courseClass->course->name ?? 'Mata Kuliah',
                     'code' => $s->courseClass->course->code ?? '',
                     'lecturer' => $s->courseClass->lecturer->name ?? 'Dosen Pengampu',

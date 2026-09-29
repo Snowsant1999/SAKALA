@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Models\CourseClass;
-use App\Models\Course;
-use App\Models\Material;
 use App\Models\Assignment;
 use App\Models\AssignmentSubmission;
+use App\Models\CourseClass;
+use App\Models\Material;
 use App\Models\Schedule;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CourseController extends Controller
 {
@@ -35,13 +34,35 @@ class CourseController extends Controller
             'class' => $class->name,
             'room' => $firstSchedule?->room?->name ?? 'Daring (Zoom)',
             'day' => $firstSchedule?->day ?? 'Senin',
-            'time' => $startTime . ' - ' . $endTime,
+            'time' => $startTime.' - '.$endTime,
             'mode' => strtoupper($firstSchedule?->mode ?? 'ONSITE'),
-            'department' => 'Teknologi Informasi',
-            'study_program' => 'Teknik Informatika (S1)',
+            'department' => $class->cohort?->studyProgram?->department?->name ?? 'Teknologi Informasi',
+            'study_program' => $class->cohort?->studyProgram?->name ?? 'Belum ditentukan',
             'description' => 'Mata kuliah terstruktur yang membekali mahasiswa dengan kemampuan teoretis dan aplikatif sesuai kurikulum berbasis kompetensi.',
-            'students_count' => 32,
+            'students_count' => $class->students()->count(),
         ];
+    }
+
+    private function assertCanAccessClass(CourseClass $class): void
+    {
+        $user = Auth::user();
+
+        if ($user->role === 'mahasiswa' && ($user->cohort_id === null || $class->cohort_id !== $user->cohort_id)) {
+            abort(404);
+        }
+
+        if ($user->role === 'dosen' && (int) $class->lecturer_id !== (int) $user->id) {
+            abort(404);
+        }
+    }
+
+    private function assertCanManageClass(CourseClass $class): void
+    {
+        $user = Auth::user();
+
+        if ($user->role !== 'admin' && ($user->role !== 'dosen' || (int) $class->lecturer_id !== (int) $user->id)) {
+            abort(403);
+        }
     }
 
     /**
@@ -50,10 +71,15 @@ class CourseController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $query = CourseClass::with(['course', 'lecturer', 'schedules.room']);
+        $query = CourseClass::with(['course', 'lecturer', 'schedules.room', 'cohort.studyProgram.department']);
 
-        // If lecturer, only show classes they teach
-        if ($user && $user->role === 'dosen') {
+        if ($user->role === 'mahasiswa') {
+            if ($user->cohort_id === null) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('cohort_id', $user->cohort_id);
+            }
+        } elseif ($user->role === 'dosen') {
             $query->where('lecturer_id', $user->id);
         }
 
@@ -62,13 +88,13 @@ class CourseController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhereHas('course', function ($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")
-                         ->orWhere('code', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('lecturer', function ($lq) use ($search) {
-                      $lq->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('course', function ($cq) use ($search) {
+                        $cq->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('lecturer', function ($lq) use ($search) {
+                        $lq->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -81,7 +107,7 @@ class CourseController extends Controller
         }
 
         $classes = $query->get();
-        $courses = $classes->map(fn($c) => $this->formatCourseClass($c))->toArray();
+        $courses = $classes->map(fn ($c) => $this->formatCourseClass($c))->toArray();
 
         return view('academic.courses.index', compact('courses', 'search', 'semester'));
     }
@@ -91,7 +117,8 @@ class CourseController extends Controller
      */
     public function show($id)
     {
-        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials', 'assignments.submissions'])->findOrFail($id);
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials', 'assignments.submissions', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
         $course = $this->formatCourseClass($class);
 
         $materials = $class->materials->map(function ($m) {
@@ -108,14 +135,22 @@ class CourseController extends Controller
         $user = Auth::user();
         $assignments = $class->assignments->map(function ($a) use ($user) {
             $mySubmission = $user ? $a->submissions->where('student_id', $user->id)->first() : null;
+
             return [
                 'id' => $a->id,
                 'title' => $a->title,
                 'description' => $a->description ?? 'Instruksi tugas',
                 'deadline' => Carbon::parse($a->deadline)->format('Y-m-d H:i'),
-                'is_submitted' => !is_null($mySubmission),
+                'is_submitted' => ! is_null($mySubmission),
                 'score' => $mySubmission?->score,
                 'feedback' => $mySubmission?->feedback,
+                'submission' => $mySubmission ? [
+                    'file_name' => basename($mySubmission->file_path),
+                    'submitted_at' => Carbon::parse($mySubmission->created_at)->translatedFormat('d M Y, H:i'),
+                    'grade' => $mySubmission->score,
+                    'feedback' => $mySubmission->feedback,
+                ] : null,
+                'late' => $mySubmission === null && Carbon::parse($a->deadline)->isPast(),
                 'submissions_count' => $a->submissions->count(),
             ];
         })->toArray();
@@ -128,7 +163,8 @@ class CourseController extends Controller
      */
     public function materials($id)
     {
-        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials'])->findOrFail($id);
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'materials', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
         $course = $this->formatCourseClass($class);
 
         $materials = $class->materials->map(function ($m) {
@@ -150,21 +186,22 @@ class CourseController extends Controller
      */
     public function addMaterial(Request $request, $id)
     {
-        $request->validate([
+        $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
         $class = CourseClass::findOrFail($id);
+        $this->assertCanManageClass($class);
 
         Material::create([
             'course_class_id' => $class->id,
-            'title' => $request->input('title'),
-            'description' => $request->input('description', ''),
-            'file_path' => 'materials/Materi_' . time() . '.pdf',
+            'title' => $data['title'],
+            'description' => $data['description'] ?? '',
+            'file_path' => 'materials/Materi_'.time().'.pdf',
         ]);
 
-        return redirect('/courses/' . $id . '/materials')->with('success', 'Materi perkuliahan berhasil ditambahkan.');
+        return redirect('/courses/'.$id.'/materials')->with('success', 'Materi perkuliahan berhasil ditambahkan.');
     }
 
     /**
@@ -172,10 +209,12 @@ class CourseController extends Controller
      */
     public function deleteMaterial($id, $materialId)
     {
+        $class = CourseClass::findOrFail($id);
+        $this->assertCanManageClass($class);
         $material = Material::where('course_class_id', $id)->findOrFail($materialId);
         $material->delete();
 
-        return redirect('/courses/' . $id . '/materials')->with('success', 'Materi berhasil dihapus.');
+        return redirect('/courses/'.$id.'/materials')->with('success', 'Materi berhasil dihapus.');
     }
 
     /**
@@ -183,20 +222,29 @@ class CourseController extends Controller
      */
     public function assignments($id)
     {
-        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'assignments.submissions'])->findOrFail($id);
+        $class = CourseClass::with(['course', 'lecturer', 'schedules.room', 'assignments.submissions', 'cohort.studyProgram.department'])->findOrFail($id);
+        $this->assertCanAccessClass($class);
         $course = $this->formatCourseClass($class);
         $user = Auth::user();
 
         $assignments = $class->assignments->map(function ($a) use ($user) {
             $mySubmission = $user ? $a->submissions->where('student_id', $user->id)->first() : null;
+
             return [
                 'id' => $a->id,
                 'title' => $a->title,
                 'description' => $a->description ?? 'Instruksi tugas',
                 'deadline' => Carbon::parse($a->deadline)->format('Y-m-d H:i'),
-                'is_submitted' => !is_null($mySubmission),
+                'is_submitted' => ! is_null($mySubmission),
                 'score' => $mySubmission?->score,
                 'feedback' => $mySubmission?->feedback,
+                'submission' => $mySubmission ? [
+                    'file_name' => basename($mySubmission->file_path),
+                    'submitted_at' => Carbon::parse($mySubmission->created_at)->translatedFormat('d M Y, H:i'),
+                    'grade' => $mySubmission->score,
+                    'feedback' => $mySubmission->feedback,
+                ] : null,
+                'late' => $mySubmission === null && Carbon::parse($a->deadline)->isPast(),
                 'submissions_count' => $a->submissions->count(),
             ];
         })->toArray();
@@ -211,35 +259,36 @@ class CourseController extends Controller
      */
     public function addAssignment(Request $request, $id)
     {
-        $request->validate([
+        $data = $request->validate([
             'title' => 'required|string|max:255',
-            'deadline' => 'required',
+            'deadline' => ['required', 'date'],
             'description' => 'nullable|string',
         ]);
 
         $class = CourseClass::with('course')->findOrFail($id);
+        $this->assertCanManageClass($class);
 
         $assignment = Assignment::create([
             'course_class_id' => $class->id,
-            'title' => $request->input('title'),
-            'deadline' => Carbon::parse($request->input('deadline')),
-            'description' => $request->input('description', ''),
-            'file_path' => 'assignments/Brief_' . time() . '.pdf',
+            'title' => $data['title'],
+            'deadline' => Carbon::parse($data['deadline']),
+            'description' => $data['description'] ?? '',
+            'file_path' => 'assignments/Brief_'.time().'.pdf',
         ]);
 
         // Notify students about the new assignment
-        $students = \App\Models\User::where('role', 'mahasiswa')->get();
+        $students = User::where('role', 'mahasiswa')->where('cohort_id', $class->cohort_id)->get();
         foreach ($students as $student) {
             NotificationController::createNotification(
                 $student->id,
-                'Tugas Baru: ' . $assignment->title,
-                "Tugas baru untuk mata kuliah " . ($class->course?->name ?? 'Mata Kuliah') . " telah dipublikasikan.",
+                'Tugas Baru: '.$assignment->title,
+                'Tugas baru untuk mata kuliah '.($class->course?->name ?? 'Mata Kuliah').' telah dipublikasikan.',
                 'assignment_new',
-                '/courses/' . $id . '/assignments'
+                '/courses/'.$id.'/assignments'
             );
         }
 
-        return redirect('/courses/' . $id . '/assignments')->with('success', 'Tugas baru berhasil diterbitkan.');
+        return redirect('/courses/'.$id.'/assignments')->with('success', 'Tugas baru berhasil diterbitkan.');
     }
 
     /**
@@ -248,13 +297,20 @@ class CourseController extends Controller
     public function submitAssignment(Request $request, $id, $assignmentId)
     {
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
+        abort_unless($user->role === 'mahasiswa', 403);
+
         $class = CourseClass::with('course')->findOrFail($id);
-        $assignment = Assignment::findOrFail($assignmentId);
-        $fileName = 'submissions/Tugas_' . $user->name . '_' . time() . '.zip';
+        $this->assertCanAccessClass($class);
+        $assignment = Assignment::where('course_class_id', $class->id)->findOrFail($assignmentId);
+        $data = $request->validate([
+            'file_name' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $fileName = 'submissions/'.$data['file_name'];
 
         AssignmentSubmission::updateOrCreate(
             [
@@ -271,14 +327,14 @@ class CourseController extends Controller
         if ($class->lecturer_id) {
             NotificationController::createNotification(
                 $class->lecturer_id,
-                'Pengumpulan Tugas: ' . $assignment->title,
-                "Mahasiswa {$user->name} telah mengumpulkan tugas untuk kelas " . ($class->course?->name ?? 'Mata Kuliah') . ".",
+                'Pengumpulan Tugas: '.$assignment->title,
+                "Mahasiswa {$user->name} telah mengumpulkan tugas untuk kelas ".$class->name.'.',
                 'submission_new',
-                '/courses/' . $id . '/assignments'
+                '/courses/'.$id.'/assignments'
             );
         }
 
-        return redirect('/courses/' . $id . '/assignments')->with('success', 'Tugas Anda berhasil dikumpulkan.');
+        return redirect('/courses/'.$id.'/assignments')->with('success', 'Tugas Anda berhasil dikumpulkan.');
     }
 
     /**
@@ -286,10 +342,26 @@ class CourseController extends Controller
      */
     public function schedule(Request $request)
     {
+        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
         $selectedDay = $request->query('day', 'Senin');
-        $allSchedules = Schedule::with(['courseClass.course', 'courseClass.lecturer', 'room.building'])->get();
+        if (! in_array($selectedDay, $days, true)) {
+            $selectedDay = 'Senin';
+        }
 
-        $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+        $user = Auth::user();
+        $scheduleQuery = Schedule::with(['courseClass.course', 'courseClass.lecturer', 'room.building']);
+
+        if ($user->role === 'mahasiswa') {
+            $scheduleQuery->whereHas('courseClass', fn ($query) => $query->where('cohort_id', $user->cohort_id));
+        } elseif ($user->role === 'dosen') {
+            $scheduleQuery->whereHas('courseClass', fn ($query) => $query->where('lecturer_id', $user->id));
+        }
+
+        if ($user->role === 'mahasiswa' && $user->cohort_id === null) {
+            $scheduleQuery->whereRaw('1 = 0');
+        }
+
+        $allSchedules = $scheduleQuery->get();
         $schedules = [];
 
         foreach ($days as $day) {
@@ -300,8 +372,8 @@ class CourseController extends Controller
                     'course' => $s->courseClass?->course?->name ?? 'Mata Kuliah',
                     'lecturer' => $s->courseClass?->lecturer?->name ?? 'Dosen',
                     'class' => $s->courseClass?->name ?? 'Kelas',
-                    'time' => substr($s->start_time, 0, 5) . ' - ' . substr($s->end_time, 0, 5),
-                    'room' => ($s->room?->name ?? 'Ruangan') . ' (' . ($s->room?->code ?? '') . ')',
+                    'time' => substr($s->start_time, 0, 5).' - '.substr($s->end_time, 0, 5),
+                    'room' => ($s->room?->name ?? 'Ruangan').' ('.($s->room?->code ?? '').')',
                     'mode' => strtoupper($s->mode),
                 ];
             })->values()->toArray();

@@ -59,6 +59,7 @@
                     <option value="under_review" {{ ($statusFilter === 'under_review') ? 'selected' : '' }}>Under Review</option>
                     <option value="in_progress" {{ ($statusFilter === 'in_progress') ? 'selected' : '' }}>In Progress</option>
                     <option value="resolved" {{ ($statusFilter === 'resolved') ? 'selected' : '' }}>Resolved (Selesai)</option>
+                    <option value="rejected" {{ ($statusFilter === 'rejected') ? 'selected' : '' }}>Rejected (Diarsipkan)</option>
                 </select>
             </div>
 
@@ -149,7 +150,7 @@
                                     <a href="{{ url('/reports/' . $r['id']) }}" class="btn btn-secondary btn-sm text-[11px]">
                                         Detail
                                     </a>
-                                    <button onclick="openUpdateModal('{{ $r['id'] }}', '{{ $r['status'] }}', '{{ $r['priority'] }}', '{{ addslashes($r['admin_note'] ?? '') }}')" class="btn btn-primary btn-sm text-[11px]">
+                                    <button type="button" data-report-update data-id="{{ $r['raw_id'] }}" data-status="{{ $r['status'] }}" data-priority="{{ $r['priority'] }}" data-note="{{ $r['admin_note'] ?? '' }}" class="btn btn-primary btn-sm text-[11px]">
                                         Tindak Lanjut
                                     </button>
                                 </div>
@@ -214,12 +215,14 @@
 
 @section('scripts')
 <script>
-    function openUpdateModal(reportId, status, priority, adminNote) {
-        document.getElementById('update-report-form').action = '{{ url("/admin/reports") }}/' + reportId + '/update';
-        document.getElementById('modal-status').value = status;
-        document.getElementById('modal-priority').value = priority;
-        document.getElementById('modal-admin-note').value = adminNote || '';
-        document.getElementById('update-report-modal').classList.remove('hidden');
-    }
+    document.querySelectorAll('[data-report-update]').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.getElementById('update-report-form').action = '{{ url("/admin/reports") }}/' + button.dataset.id + '/update';
+            document.getElementById('modal-status').value = button.dataset.status;
+            document.getElementById('modal-priority').value = button.dataset.priority;
+            document.getElementById('modal-admin-note').value = button.dataset.note || '';
+            document.getElementById('update-report-modal').classList.remove('hidden');
+        });
+    });
 </script>
 @endsection

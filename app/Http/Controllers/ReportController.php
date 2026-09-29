@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Report;
+use App\Models\ReportStatusHistory;
+use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
-use App\Models\Report;
-use App\Models\ReportStatusHistory;
-use App\Models\User;
-use Carbon\Carbon;
 
 class ReportController extends Controller
 {
@@ -47,7 +47,7 @@ class ReportController extends Controller
                 return [
                     'time' => $history->created_at->translatedFormat('d M Y, H:i'),
                     'title' => $statusLabel,
-                    'desc' => ($history->admin_note ?: 'Pembaruan laporan tercatat.') . $priorityLabel,
+                    'desc' => ($history->admin_note ?: 'Pembaruan laporan tercatat.').$priorityLabel,
                     'status' => 'completed',
                 ];
             })
@@ -64,7 +64,7 @@ class ReportController extends Controller
         }
 
         return [
-            'id' => 'RPT-' . str_pad($r->id, 4, '0', STR_PAD_LEFT),
+            'id' => 'RPT-'.str_pad($r->id, 4, '0', STR_PAD_LEFT),
             'raw_id' => $r->id,
             'category' => $r->category,
             'incident_date' => Carbon::parse($r->incident_date)->format('Y-m-d'),
@@ -91,7 +91,7 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
@@ -107,7 +107,7 @@ class ReportController extends Controller
             $query->where('category', 'like', "%{$categoryFilter}%");
         }
 
-        $reports = $query->get()->map(fn($r) => $this->formatReport($r))->toArray();
+        $reports = $query->get()->map(fn ($r) => $this->formatReport($r))->toArray();
 
         return view('reports.index', compact('reports', 'categoryFilter'));
     }
@@ -135,7 +135,7 @@ class ReportController extends Controller
         ]);
 
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
@@ -162,7 +162,7 @@ class ReportController extends Controller
         ]);
 
         // Notify admins about the new report
-        $admins = \App\Models\User::where('role', 'admin')->get();
+        $admins = User::where('role', 'admin')->get();
         foreach ($admins as $admin) {
             NotificationController::createNotification(
                 $admin->id,
@@ -173,7 +173,7 @@ class ReportController extends Controller
             );
         }
 
-        return redirect('/reports/' . $report->id)->with('success', 'Laporan Anda telah berhasil dikirim dengan aman dan privasi terjamin.');
+        return redirect('/reports/'.$report->id)->with('success', 'Laporan Anda telah berhasil dikirim dengan aman dan privasi terjamin.');
     }
 
     /**
@@ -225,6 +225,7 @@ class ReportController extends Controller
                 'under_review' => 'under_review',
                 'in_progress' => 'in_progress',
                 'rejected' => 'rejected',
+                'rejected' => 'rejected',
                 'resolved' => 'resolved',
                 default => $statusFilter,
             };
@@ -241,11 +242,11 @@ class ReportController extends Controller
         $inProgressCount = (clone $allReports)->where('status', 'in_progress')->count();
         $submittedCount = $allReports->where('status', 'pending')->count();
 
-        $reports = $query->get()->map(fn($r) => $this->formatReport($r))->toArray();
+        $reports = $query->get()->map(fn ($r) => $this->formatReport($r))->toArray();
 
         return view('admin.reports.index', compact(
-            'reports', 
-            'statusFilter', 
+            'reports',
+            'statusFilter',
             'priorityFilter',
             'urgentCount',
             'highCount',

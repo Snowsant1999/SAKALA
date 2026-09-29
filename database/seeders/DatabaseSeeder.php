@@ -3,9 +3,8 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -20,7 +19,9 @@ class DatabaseSeeder extends Seeder
         DB::table('assignments')->truncate();
         DB::table('materials')->truncate();
         DB::table('schedules')->truncate();
+        DB::table('course_class_student')->truncate();
         DB::table('course_classes')->truncate();
+        DB::table('cohorts')->truncate();
         DB::table('courses')->truncate();
         DB::table('rooms')->truncate();
         DB::table('buildings')->truncate();
@@ -383,6 +384,13 @@ class DatabaseSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        $this->call(AdditionalCourseClassesSeeder::class);
+
+        $cohortTim5A = DB::table('cohorts')->where('name', 'TIM 5A')->value('id');
+        $cohortTrk5A = DB::table('cohorts')->where('name', 'TRK 5A')->value('id');
+        DB::table('users')->whereIn('id', [$mhsHaikal, $mhsAndi])->update(['cohort_id' => $cohortTim5A]);
+        DB::table('users')->where('id', $mhsCitra)->update(['cohort_id' => $cohortTrk5A]);
+
         // 6. Schedules
         DB::table('schedules')->insert([
             [
@@ -485,7 +493,10 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $assignDb1 = DB::table('assignments')->insertGetId([
-            'course_class_id' => $classDbA,
+            'course_class_id' => DB::table('course_classes')
+                ->where('course_id', $cDB)
+                ->where('cohort_id', $cohortTrk5A)
+                ->value('id'),
             'title' => 'ER Diagram Sistem Perpustakaan',
             'description' => 'Rancang ERD konseptual dan fisik untuk studi kasus perpustakaan digital terdistribusi.',
             'deadline' => now()->addDays(4),
@@ -682,7 +693,7 @@ class DatabaseSeeder extends Seeder
             [
                 'user_id' => $mhsHaikal,
                 'title' => 'Reservasi Disetujui',
-                'message' => 'Pengajuan peminjaman Lab Rekayasa Komputer pada tanggal ' . now()->addDays(2)->format('d/m/Y') . ' telah disetujui.',
+                'message' => 'Pengajuan peminjaman Lab Rekayasa Komputer pada tanggal '.now()->addDays(2)->format('d/m/Y').' telah disetujui.',
                 'type' => 'reservation_approved',
                 'link' => '/reservations/2',
                 'is_read' => false,

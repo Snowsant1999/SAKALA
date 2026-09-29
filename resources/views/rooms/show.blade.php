@@ -41,7 +41,7 @@
             </div>
 
             <div>
-                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status Saat Ini</div>
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Status Tanggal Terpilih</div>
                 <span class="room-status {{ strtolower($room['status']) }} text-sm px-3 py-1.5">
                     @if($room['status'] == 'KOSONG')
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -49,10 +49,12 @@
                         <span class="w-2 h-2 rounded-full bg-red-500"></span>
                     @elseif($room['status'] == 'RESERVED')
                         <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    @elseif($room['status'] == 'PENUH')
+                        <span class="w-2 h-2 rounded-full bg-slate-500"></span>
                     @else
                         <span class="w-2 h-2 rounded-full bg-slate-500"></span>
                     @endif
-                    {{ $room['status'] }}
+                    {{ $room['status'] == 'KOSONG' ? 'Tersedia' : ($room['status'] == 'PENUH' ? 'Penuh' : $room['status']) }}
                 </span>
             </div>
         </div>
@@ -60,17 +62,26 @@
 
     {{-- Right Panel: Schedule Timeline --}}
     <div class="flex-1 bg-slate-100/50 p-6 md:p-8">
-        <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-slate-800">Jadwal Hari Ini</h3>
-            <span class="text-sm font-medium text-slate-500">{{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}</span>
+        <form action="{{ url('/rooms/'.$room['id']) }}" method="GET" class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+            <div class="w-full sm:max-w-xs">
+                <label class="form-label text-xs" for="room-date">Tanggal ketersediaan</label>
+                <input type="date" name="date" id="room-date" class="form-input" min="{{ today()->toDateString() }}" value="{{ $selectedDate }}">
+            </div>
+            <button type="submit" class="btn btn-secondary">Lihat Jadwal</button>
+        </form>
+        <div class="mb-4 text-sm font-medium text-slate-500">
+            Jadwal {{ \Carbon\Carbon::parse($selectedDate)->locale('id')->translatedFormat('d F Y') }}
         </div>
 
         <div class="space-y-4">
             @forelse($schedules as $schedule)
                 @if($schedule['status'] == 'OCCUPIED' || $schedule['status'] == 'RESERVED_SLOT')
                     {{-- Occupied/Reserved Slot --}}
-                    <div class="bg-slate-300/40 rounded-xl p-5 border border-slate-300">
+                    <div class="{{ $schedule['status'] == 'RESERVED_SLOT' ? 'bg-amber-50 rounded-xl p-5 border border-amber-200' : 'bg-slate-300/40 rounded-xl p-5 border border-slate-300' }}">
                         <div class="text-lg font-bold text-slate-800 mb-3">{{ $schedule['time'] }}</div>
+                        @if($schedule['status'] == 'RESERVED_SLOT')
+                            <span class="inline-flex items-center px-2.5 py-1 mb-3 text-xs font-bold rounded-md bg-amber-100 text-amber-800">RESERVED</span>
+                        @endif
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <div class="text-sm text-slate-500 mb-0.5">Mata Kuliah / Kegiatan</div>
@@ -104,6 +115,7 @@
                             'room_name' => $room['name'],
                             'building' => $room['buildingName'],
                             'floor' => $room['floorLabel'],
+                            'date' => $selectedDate,
                             'start_time' => $startTime,
                             'end_time' => $endTime,
                         ]);

@@ -70,6 +70,12 @@
             <a href="{{ url('/admin/reservations?tab=rejected') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'rejected') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
                 Ditolak ({{ $rejectedCount }})
             </a>
+            <a href="{{ url('/admin/reservations?tab=cancelled') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'cancelled') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
+                Dibatalkan ({{ $cancelledCount }})
+            </a>
+            <a href="{{ url('/admin/reservations?tab=completed') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'completed') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
+                Selesai ({{ $completedCount }})
+            </a>
             <a href="{{ url('/admin/reservations?tab=all') }}" class="px-4 py-2.5 rounded-lg text-xs font-bold transition-all shrink-0 {{ ($activeTab === 'all') ? 'bg-navy-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100' }}">
                 Semua Riwayat
             </a>
@@ -120,7 +126,7 @@
                                 <div class="space-y-3">
                                     <div class="flex items-center justify-between">
                                         <span class="badge badge-primary font-mono text-[11px]">{{ $r['id'] }}</span>
-                                        <span class="badge badge-warning text-[10px]">Opsi #{{ $index + 1 }}</span>
+                                        <span class="badge {{ $r['status'] === 'PENDING' ? 'badge-warning' : 'badge-success' }} text-[10px]">{{ $r['status'] === 'PENDING' ? 'Menunggu Review' : 'Sudah Disetujui' }}</span>
                                     </div>
 
                                     <div>
@@ -143,6 +149,7 @@
                                     <a href="{{ url('/reservations/' . $r['raw_id']) }}" class="text-xs text-slate-500 hover:text-slate-800 font-medium">Detail Lengkap</a>
                                     
                                     <div class="flex items-center gap-2">
+                                        @if($r['status'] === 'PENDING')
                                         {{-- Reject Button --}}
                                         <form action="{{ url('/admin/reservations/' . $r['raw_id'] . '/reject') }}" method="POST">
                                             @csrf
@@ -159,6 +166,7 @@
                                                 ✓ Setujui & Kunci Slot
                                             </button>
                                         </form>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -215,6 +223,10 @@
                                 <td>
                                     @if($r['status'] === 'APPROVED')
                                         <span class="badge badge-success text-[10px]">APPROVED</span>
+                                    @elseif($r['status'] === 'COMPLETED')
+                                        <span class="badge badge-info text-[10px]">COMPLETED</span>
+                                    @elseif($r['status'] === 'CANCELLED')
+                                        <span class="badge badge-gray text-[10px]">CANCELLED</span>
                                     @elseif($r['status'] === 'PENDING')
                                         <span class="badge badge-warning text-[10px]">PENDING</span>
                                     @else

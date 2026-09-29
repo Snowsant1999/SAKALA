@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CourseClass extends Model
@@ -14,6 +13,11 @@ class CourseClass extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function cohort(): BelongsTo
+    {
+        return $this->belongsTo(Cohort::class);
     }
 
     public function lecturer(): BelongsTo
@@ -36,9 +40,11 @@ class CourseClass extends Model
         return $this->hasMany(Assignment::class);
     }
 
-    public function students(): BelongsToMany
+    public function students(): HasMany
     {
-        return $this->belongsToMany(User::class, 'course_class_student')->withTimestamps();
+        return $this->hasMany(User::class, 'cohort_id', 'cohort_id')
+            ->where('role', 'mahasiswa')
+            ->whereNotNull('users.cohort_id');
     }
 
     public function reservations(): HasMany

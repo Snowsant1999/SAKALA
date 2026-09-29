@@ -3,10 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
@@ -38,6 +37,11 @@ class User extends Authenticatable
         return $this->belongsTo(StudyProgram::class);
     }
 
+    public function cohort(): BelongsTo
+    {
+        return $this->belongsTo(Cohort::class);
+    }
+
     public function taughtClasses(): HasMany
     {
         return $this->hasMany(CourseClass::class, 'lecturer_id');
@@ -61,10 +65,5 @@ class User extends Authenticatable
     public function submissions(): HasMany
     {
         return $this->hasMany(AssignmentSubmission::class, 'student_id');
-    }
-
-    public function courseClasses(): BelongsToMany
-    {
-        return $this->belongsToMany(CourseClass::class, 'course_class_student')->withTimestamps();
     }
 }

@@ -135,7 +135,7 @@
                                     <a href="{{ url('/aspirations/' . $a['raw_id']) }}" class="btn btn-secondary btn-sm text-[11px]">
                                         Detail
                                     </a>
-                                    <button onclick="openAspirationModal('{{ $a['raw_id'] }}', '{{ $a['status'] }}', '{{ addslashes($a['admin_notes'] ?? '') }}')" class="btn btn-primary btn-sm text-[11px]">
+                                    <button type="button" data-aspiration-update data-id="{{ $a['raw_id'] }}" data-status="{{ $a['status'] }}" data-note="{{ $a['admin_notes'] ?? '' }}" class="btn btn-primary btn-sm text-[11px]">
                                         Update Status
                                     </button>
                                 </div>
@@ -189,11 +189,13 @@
 
 @section('scripts')
 <script>
-    function openAspirationModal(id, status, notes) {
-        document.getElementById('update-aspiration-form').action = '{{ url("/admin/aspirations") }}/' + id + '/update';
-        document.getElementById('modal-asp-status').value = status;
-        document.getElementById('modal-asp-notes').value = notes || '';
-        document.getElementById('update-aspiration-modal').classList.remove('hidden');
-    }
+    document.querySelectorAll('[data-aspiration-update]').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.getElementById('update-aspiration-form').action = '{{ url("/admin/aspirations") }}/' + button.dataset.id + '/update';
+            document.getElementById('modal-asp-status').value = button.dataset.status;
+            document.getElementById('modal-asp-notes').value = button.dataset.note || '';
+            document.getElementById('update-aspiration-modal').classList.remove('hidden');
+        });
+    });
 </script>
 @endsection

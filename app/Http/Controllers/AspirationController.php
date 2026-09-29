@@ -7,6 +7,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class AspirationController extends Controller
 {
@@ -51,7 +52,7 @@ class AspirationController extends Controller
         }
 
         return [
-            'id' => 'ASP-' . str_pad($a->id, 4, '0', STR_PAD_LEFT),
+            'id' => 'ASP-'.str_pad($a->id, 4, '0', STR_PAD_LEFT),
             'raw_id' => $a->id,
             'category' => $a->category,
             'location' => $a->location,
@@ -72,7 +73,7 @@ class AspirationController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
@@ -99,7 +100,7 @@ class AspirationController extends Controller
             $query->where('status', $dbStatus);
         }
 
-        $aspirations = $query->get()->map(fn($a) => $this->formatAspiration($a))->toArray();
+        $aspirations = $query->get()->map(fn ($a) => $this->formatAspiration($a))->toArray();
 
         return view('aspirations.index', compact('aspirations', 'categoryFilter', 'statusFilter'));
     }
@@ -124,7 +125,7 @@ class AspirationController extends Controller
         ]);
 
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
@@ -137,7 +138,7 @@ class AspirationController extends Controller
         ]);
 
         // Notify admins about the new aspiration
-        $admins = \App\Models\User::where('role', 'admin')->get();
+        $admins = User::where('role', 'admin')->get();
         foreach ($admins as $admin) {
             NotificationController::createNotification(
                 $admin->id,
@@ -148,7 +149,7 @@ class AspirationController extends Controller
             );
         }
 
-        return redirect('/aspirations/' . $aspiration->id)->with('success', 'Aspirasi / keluhan fasilitas Anda berhasil dikirimkan ke bagian Sarana & Prasarana.');
+        return redirect('/aspirations/'.$aspiration->id)->with('success', 'Aspirasi / keluhan fasilitas Anda berhasil dikirimkan ke bagian Sarana & Prasarana.');
     }
 
     /**
@@ -199,7 +200,7 @@ class AspirationController extends Controller
         $resolvedCount = $allAspirations->where('status', 'resolved')->count();
         $totalCount = $allAspirations->count();
 
-        $aspirations = $query->get()->map(fn($a) => $this->formatAspiration($a))->toArray();
+        $aspirations = $query->get()->map(fn ($a) => $this->formatAspiration($a))->toArray();
 
         return view('admin.aspirations.index', compact(
             'aspirations',
@@ -217,14 +218,15 @@ class AspirationController extends Controller
      */
     public function adminUpdate(Request $request, $id)
     {
-        $request->validate([
-            'status' => 'required|string',
+        $data = $request->validate([
+            'status' => ['required', Rule::in(['PENDING', 'DIPROSES', 'PROCESSING', 'SELESAI', 'RESOLVED', 'DITOLAK', 'DISMISSED'])],
+            'admin_notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
         $aspiration = Aspiration::findOrFail($numericId);
 
-        $dbStatus = match (strtoupper($request->input('status'))) {
+        $dbStatus = match ($data['status']) {
             'PENDING' => 'pending',
             'DIPROSES', 'PROCESSING' => 'processing',
             'SELESAI', 'RESOLVED' => 'resolved',
@@ -234,11 +236,11 @@ class AspirationController extends Controller
 
         $aspiration->update([
             'status' => $dbStatus,
-            'admin_notes' => $request->input('admin_notes', $aspiration->admin_notes),
+            'admin_notes' => $data['admin_notes'] ?? $aspiration->admin_notes,
         ]);
 
         if ($aspiration->reporter_id) {
-            $statusLabel = match($dbStatus) {
+            $statusLabel = match ($dbStatus) {
                 'processing' => 'Sedang Ditindaklanjuti',
                 'resolved' => 'Telah Selesai Ditangani',
                 'dismissed' => 'Ditolak / Diarsipkan',
@@ -248,9 +250,9 @@ class AspirationController extends Controller
             NotificationController::createNotification(
                 $aspiration->reporter_id,
                 'Update Layanan Aspirasi',
-                "Aspirasi ASP-" . str_pad($aspiration->id, 4, '0', STR_PAD_LEFT) . " ({$aspiration->category}) kini berstatus: {$statusLabel}.",
+                'Aspirasi ASP-'.str_pad($aspiration->id, 4, '0', STR_PAD_LEFT)." ({$aspiration->category}) kini berstatus: {$statusLabel}.",
                 'aspiration_status',
-                '/aspirations/' . $aspiration->id
+                '/aspirations/'.$aspiration->id
             );
         }
 

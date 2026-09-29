@@ -8,7 +8,7 @@
     {{-- Day Filter Tabs --}}
     <div class="card p-3">
         <div class="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $day)
+            @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'] as $day)
                 <a href="{{ url('/schedule?day=' . $day) }}" class="px-5 py-2.5 rounded-lg text-sm font-bold transition-all shrink-0 {{ ($selectedDay === $day) ? 'bg-navy-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100' }}">
                     {{ $day }}
                     <span class="ml-1.5 text-xs opacity-75 font-normal">({{ count($schedules[$day] ?? []) }})</span>
@@ -34,6 +34,8 @@
                         <span class="badge badge-primary font-mono text-xs">{{ $s['code'] }}</span>
                         @if($s['mode'] === 'ONLINE')
                             <span class="badge bg-purple-50 text-purple-700 text-xs font-semibold">🌐 Daring (Online)</span>
+                        @elseif($s['mode'] === 'CANCELLED')
+                            <span class="badge badge-gray text-xs font-semibold">Dibatalkan</span>
                         @else
                             <span class="badge badge-success text-xs font-semibold">📍 Tatap Muka</span>
                         @endif

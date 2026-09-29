@@ -3,12 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Building;
+use App\Models\Cohort;
 use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\Department;
 use App\Models\Floor;
-use App\Models\Report;
-use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\StudyProgram;
@@ -81,10 +80,6 @@ class AdminMasterDataController extends Controller
         $fields = $this->formFields($resource, $record === null);
         $recordValues = $record?->toArray() ?? [];
 
-        if ($record instanceof CourseClass) {
-            $recordValues['student_ids'] = $record->students()->pluck('users.id')->all();
-        }
-
         return view('admin.master.form', [
             'resource' => $resource,
             'resourceTitle' => $resourceTitle,
@@ -101,6 +96,7 @@ class AdminMasterDataController extends Controller
     {
         return match ($resource) {
             'users', 'students', 'lecturers' => User::class,
+            'cohorts' => Cohort::class,
             'departments' => Department::class,
             'study-programs' => StudyProgram::class,
             'courses' => Course::class,
@@ -117,6 +113,7 @@ class AdminMasterDataController extends Controller
     {
         return match ($resource) {
             'users' => 'Pengguna',
+            'cohorts' => 'Rombongan',
             'students' => 'Mahasiswa',
             'lecturers' => 'Dosen',
             'departments' => 'Jurusan',
@@ -145,10 +142,10 @@ class AdminMasterDataController extends Controller
             ->map(fn (Building $building): array => ['value' => $building->id, 'label' => $building->name])->all();
         $floors = Floor::with('building')->orderBy('building_id')->orderBy('number')->get()
             ->map(fn (Floor $floor): array => ['value' => $floor->id, 'label' => $floor->building->name.' - '.$floor->label])->all();
-        $classes = CourseClass::with('course')->orderBy('name')->get()
+        $classes = CourseClass::with('course')->orderBy('name')->orderBy('id')->get()
             ->map(fn (CourseClass $class): array => ['value' => $class->id, 'label' => $class->name.' - '.$class->course->name])->all();
-        $students = User::where('role', 'mahasiswa')->orderBy('name')->get(['id', 'name'])
-            ->map(fn (User $student): array => ['value' => $student->id, 'label' => $student->name])->all();
+        $cohorts = Cohort::orderBy('name')->get(['id', 'name'])
+            ->map(fn (Cohort $cohort): array => ['value' => $cohort->id, 'label' => $cohort->name])->all();
         $rooms = Room::orderBy('name')->get(['id', 'name'])
             ->map(fn (Room $room): array => ['value' => $room->id, 'label' => $room->name])->all();
 
@@ -168,6 +165,7 @@ class AdminMasterDataController extends Controller
                 $text('nim_nip', $resource === 'lecturers' ? 'NIDN' : 'NIM/NIP', false),
                 $resource !== 'lecturers' ? $select('department_id', 'Jurusan', $departments, false) : $select('department_id', 'Jurusan', $departments, false),
                 $resource !== 'lecturers' ? $select('study_program_id', 'Program Studi', $programs, false) : null,
+                $resource === 'students' ? $select('cohort_id', 'Rombongan / Kelas', $cohorts, false) : null,
                 $resource === 'lecturers' || $resource === 'users' ? $text('specialization', 'Bidang Keahlian', false) : null,
                 $resource === 'students' || $resource === 'users' ? $number('semester', 'Semester', false) : null,
                 $resource === 'students' || $resource === 'users' ? $number('ipk', 'IPK', false, '0.01') : null,
@@ -199,12 +197,16 @@ class AdminMasterDataController extends Controller
                 $number('credits', 'SKS'),
                 $number('semester', 'Semester'),
             ],
+            'cohorts' => [
+                $select('study_program_id', 'Program Studi', $programs, false),
+                $text('name', 'Nama Rombongan'),
+            ],
             'classes' => [
                 $select('course_id', 'Mata Kuliah', $courses),
                 $select('lecturer_id', 'Dosen Wali', $lecturers),
+                $select('cohort_id', 'Rombongan', $cohorts),
                 $text('name', 'Nama Kelas'),
                 $text('academic_year', 'Tahun Akademik', false),
-                $select('student_ids', 'Mahasiswa', $students, false, true),
             ],
             'buildings' => [
                 $select('department_id', 'Jurusan', $departments, false),
@@ -255,9 +257,11 @@ class AdminMasterDataController extends Controller
                 'nim_nip' => ['nullable', 'string', 'max:255', $unique('users', 'nim_nip')],
                 'department_id' => ['nullable', 'exists:departments,id'],
                 'study_program_id' => ['nullable', 'exists:study_programs,id'],
+                'cohort_id' => $resource === 'students' ? ['nullable', 'exists:cohorts,id'] : ['prohibited'],
                 'specialization' => ['nullable', 'string', 'max:255'],
                 'semester' => ['nullable', 'integer', 'min:1', 'max:20'],
                 'ipk' => ['nullable', 'numeric', 'min:0', 'max:4'],
+                'class_id' => ['prohibited'],
                 'status' => ['required', Rule::in(['active', 'inactive'])],
                 'password' => [$id === null ? 'required' : 'nullable', 'string', 'min:8', 'confirmed'],
                 'password_confirmation' => [$id === null ? 'required_with:password' : 'nullable', 'string'],
@@ -281,13 +285,16 @@ class AdminMasterDataController extends Controller
                 'credits' => ['required', 'integer', 'min:1', 'max:40'],
                 'semester' => ['required', 'integer', 'min:1', 'max:20'],
             ],
+            'cohorts' => [
+                'study_program_id' => ['nullable', 'exists:study_programs,id'],
+                'name' => ['required', 'string', 'max:255', $unique('cohorts', 'name')],
+            ],
             'classes' => [
                 'course_id' => ['required', 'exists:courses,id'],
                 'lecturer_id' => ['required', Rule::exists('users', 'id')->where('role', 'dosen')],
+                'cohort_id' => ['required', 'exists:cohorts,id'],
                 'name' => ['required', 'string', 'max:255'],
                 'academic_year' => ['nullable', 'string', 'max:32'],
-                'student_ids' => ['nullable', 'array'],
-                'student_ids.*' => ['integer', 'distinct', Rule::exists('users', 'id')->where('role', 'mahasiswa')],
             ],
             'buildings' => [
                 'department_id' => ['nullable', 'exists:departments,id'],
@@ -325,8 +332,7 @@ class AdminMasterDataController extends Controller
 
     private function saveResource(Request $request, string $resource, ?Model $record, array $data): void
     {
-        $studentIds = $resource === 'classes' ? ($data['student_ids'] ?? []) : null;
-        unset($data['password_confirmation'], $data['student_ids']);
+        unset($data['password_confirmation']);
 
         if (in_array($resource, ['students', 'lecturers'], true)) {
             $data['role'] = $resource === 'students' ? 'mahasiswa' : 'dosen';
@@ -344,13 +350,9 @@ class AdminMasterDataController extends Controller
         }
 
         $modelClass = $this->modelClass($resource);
-        $record ??= new $modelClass();
+        $record ??= new $modelClass;
         $record->fill($data);
         $record->save();
-
-        if ($record instanceof CourseClass) {
-            $record->students()->sync($studentIds ?? []);
-        }
     }
 
     private function assertResourceRole(string $resource, Model $record): void
@@ -366,7 +368,7 @@ class AdminMasterDataController extends Controller
 
     private function validateScheduleSlot(array $data, ?int $id): void
     {
-        if (!isset($data['course_class_id']) || $data['mode'] !== 'ONSITE') {
+        if (! isset($data['course_class_id']) || $data['mode'] !== 'ONSITE') {
             return;
         }
 
@@ -393,12 +395,12 @@ class AdminMasterDataController extends Controller
                 || $record->reports()->exists()
                 || $record->aspirations()->exists()
                 || $record->taughtClasses()->exists()
-                || $record->courseClasses()->exists()
+                || $record->cohort_id !== null
                 || $record->submissions()->exists(),
             'students' => $record->reservations()->exists()
                 || $record->reports()->exists()
                 || $record->aspirations()->exists()
-                || $record->courseClasses()->exists()
+                || $record->cohort_id !== null
                 || $record->submissions()->exists(),
             'lecturers' => $record->taughtClasses()->exists(),
             'departments' => $record->studyPrograms()->exists()
@@ -411,6 +413,7 @@ class AdminMasterDataController extends Controller
                 || $record->assignments()->exists()
                 || $record->reservations()->exists()
                 || $record->students()->exists(),
+            'cohorts' => $record->students()->exists() || $record->courseClasses()->exists(),
             'buildings' => $record->rooms()->exists() || $record->floors()->exists(),
             'floors' => $record->rooms()->exists(),
             'rooms' => $record->schedules()->exists() || $record->reservations()->exists(),

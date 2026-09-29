@@ -39,7 +39,9 @@
             <table class="data-table">
                 <thead>
                     <tr>
+                        <th>Mata Kuliah</th>
                         <th>Nama Kelas</th>
+                        <th>Rombongan</th>
                         <th>Program Studi</th>
                         <th>Tahun Akademik</th>
                         <th>Wali Kelas</th>
@@ -50,6 +52,7 @@
                 <tbody>
                     @foreach($classes as $c)
                         <tr data-class-row>
+                            <td class="text-xs font-semibold text-slate-800">{{ $c['course'] }}</td>
                             <td>
                                 <div class="flex items-center gap-3">
                                     <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
@@ -58,6 +61,7 @@
                                     <span class="font-bold text-xs text-slate-800">{{ $c['name'] }}</span>
                                 </div>
                             </td>
+                            <td class="text-xs text-slate-700">{{ $c['cohort'] }}</td>
                             <td class="text-xs text-slate-700">{{ $c['program'] }}</td>
                             <td><span class="badge text-[10px]" style="background: #f0f9ff; color: #0369a1;">{{ $c['academic_year'] }}</span></td>
                             <td class="text-xs text-slate-600">{{ $c['homeroom'] }}</td>

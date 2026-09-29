@@ -1,17 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\RoomController;
-use App\Http\Controllers\CourseController;
-use App\Http\Controllers\ReservationController;
-use App\Http\Controllers\ReportController;
-use App\Http\Controllers\AspirationController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\AdminMasterController;
 use App\Http\Controllers\AdminMasterDataController;
+use App\Http\Controllers\AspirationController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CourseController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\RoomController;
+use Illuminate\Support\Facades\Route;
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'login'])->name('login');
@@ -19,7 +19,7 @@ Route::post('/login', [AuthController::class, 'authenticate']);
 Route::post('/logout', [AuthController::class, 'logout']);
 
 Route::middleware(['auth'])->group(function () {
-    
+
     // Redirect root to dashboard
     Route::get('/', function () {
         return redirect('/dashboard');
@@ -96,12 +96,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/study-programs', [AdminMasterController::class, 'studyPrograms']);
         Route::get('/courses', [AdminMasterController::class, 'courses']);
         Route::get('/classes', [AdminMasterController::class, 'classes']);
+        Route::get('/cohorts', [AdminMasterController::class, 'cohorts']);
         Route::get('/buildings', [AdminMasterController::class, 'buildings']);
         Route::get('/floors', [AdminMasterController::class, 'floors']);
         Route::get('/rooms', [AdminMasterController::class, 'rooms']);
         Route::get('/schedules', [AdminMasterController::class, 'schedules']);
 
-        $masterResources = 'users|students|lecturers|departments|study-programs|courses|classes|buildings|floors|rooms|schedules';
+        $masterResources = 'users|students|lecturers|departments|study-programs|courses|classes|cohorts|buildings|floors|rooms|schedules';
         Route::get('/{resource}/create', [AdminMasterDataController::class, 'create'])->where('resource', $masterResources);
         Route::post('/{resource}', [AdminMasterDataController::class, 'store'])->where('resource', $masterResources);
         Route::get('/{resource}/{id}/edit', [AdminMasterDataController::class, 'edit'])->where(['resource' => $masterResources, 'id' => '[0-9]+']);

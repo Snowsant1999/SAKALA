@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Models\CourseClass;
 use App\Models\Reservation;
 use App\Models\Room;
-use App\Models\Course;
-use App\Models\CourseClass;
 use App\Models\User;
+use App\Services\ReservationConflictDetector;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class ReservationController extends Controller
@@ -21,14 +22,14 @@ class ReservationController extends Controller
     private function formatReservation(Reservation $r): array
     {
         return [
-            'id' => 'RSV-' . str_pad($r->id, 4, '0', STR_PAD_LEFT),
+            'id' => 'RSV-'.str_pad($r->id, 4, '0', STR_PAD_LEFT),
             'raw_id' => $r->id,
             'room_id' => $r->room_id,
-            'room_name' => ($r->room?->name ?? 'Ruangan') . ' (' . ($r->room?->code ?? '') . ')',
+            'room_name' => ($r->room?->name ?? 'Ruangan').' ('.($r->room?->code ?? '').')',
             'building' => $r->room?->building?->name ?? 'Gedung TI',
             'floor' => $r->room?->floorRecord?->label ?? ('Lantai '.$r->room?->floor),
             'date' => Carbon::parse($r->date)->format('Y-m-d'),
-            'time_formatted' => substr($r->start_time, 0, 5) . ' - ' . substr($r->end_time, 0, 5),
+            'time_formatted' => substr($r->start_time, 0, 5).' - '.substr($r->end_time, 0, 5),
             'start_time' => substr($r->start_time, 0, 5),
             'end_time' => substr($r->end_time, 0, 5),
             'requester_name' => $r->user?->name ?? 'Pemohon',
@@ -40,7 +41,12 @@ class ReservationController extends Controller
             'course' => $r->course?->name ?? $r->courseClass?->course?->name ?? 'Kegiatan umum',
             'purpose' => $r->purpose,
             'notes' => $r->notes,
-            'status' => strtoupper($r->status),
+            'status' => match (strtolower($r->status)) {
+                'approved' => $r->date->isBefore(today()) ? 'COMPLETED' : 'APPROVED',
+                'cancelled' => 'CANCELLED',
+                'completed' => 'COMPLETED',
+                default => strtoupper($r->status),
+            },
             'admin_note' => $r->admin_notes,
             'created_at' => Carbon::parse($r->created_at)->translatedFormat('d M Y, H:i'),
         ];
@@ -52,7 +58,7 @@ class ReservationController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        if (!$user) {
+        if (! $user) {
             return redirect('/login');
         }
 
@@ -69,7 +75,7 @@ class ReservationController extends Controller
             $query->where('status', $statusFilter);
         }
 
-        $reservations = $query->get()->map(fn($r) => $this->formatReservation($r))->toArray();
+        $reservations = $query->get()->map(fn ($r) => $this->formatReservation($r))->toArray();
 
         return view('reservations.index', compact('reservations', 'statusFilter'));
     }
@@ -83,19 +89,40 @@ class ReservationController extends Controller
         $room = $roomId ? Room::with(['building', 'floorRecord'])->find($roomId) : null;
         $rooms = Room::with(['building', 'floorRecord'])->orderBy('name')->get();
 
-        $date = $request->query('date', Carbon::tomorrow()->format('Y-m-d'));
+        $requestedDate = $request->query('date');
+        $date = Carbon::tomorrow()->format('Y-m-d');
+        if (is_string($requestedDate) && Validator::make(
+            ['date' => $requestedDate],
+            ['date' => ['date_format:Y-m-d', 'after_or_equal:today']],
+        )->passes()) {
+            $date = $requestedDate;
+        }
         $startTime = $request->query('start_time', '13:00');
         $endTime = $request->query('end_time', '15:00');
 
-        $courses = Course::orderBy('name')->get()->map(function ($c) {
+        $user = Auth::user();
+        $classQuery = CourseClass::with('course')->orderBy('name');
+
+        if ($user->role === 'mahasiswa') {
+            if ($user->cohort_id === null) {
+                $classQuery->whereRaw('1 = 0');
+            } else {
+                $classQuery->where('cohort_id', $user->cohort_id);
+            }
+        } elseif ($user->role === 'dosen') {
+            $classQuery->where('lecturer_id', $user->id);
+        }
+
+        $courseClasses = $classQuery->get();
+        $courses = $courseClasses->pluck('course')->filter()->unique('id')->map(function ($course) {
             return [
-                'id' => $c->id,
-                'code' => $c->code,
-                'name' => $c->name,
+                'id' => $course->id,
+                'code' => $course->code,
+                'name' => $course->name,
             ];
         })->toArray();
 
-        $classes = CourseClass::with('course')->orderBy('name')->get()->map(fn (CourseClass $class): array => [
+        $classes = $courseClasses->map(fn (CourseClass $class): array => [
             'id' => $class->id,
             'name' => $class->name,
             'course_id' => $class->course_id,
@@ -123,10 +150,25 @@ class ReservationController extends Controller
         ]);
 
         $courseClass = isset($data['course_class_id']) ? CourseClass::findOrFail($data['course_class_id']) : null;
+
+        if ($user->role === 'mahasiswa') {
+            $belongsToCohort = $courseClass !== null && $courseClass->cohort_id === $user->cohort_id;
+            if (! $belongsToCohort) {
+                throw ValidationException::withMessages([
+                    'course_class_id' => 'Pilih kelas mata kuliah dari rombongan Anda.',
+                ]);
+            }
+        }
+
+        if ($user->role === 'dosen' && $courseClass && (int) $courseClass->lecturer_id !== (int) $user->id) {
+            throw ValidationException::withMessages([
+                'course_class_id' => 'Anda hanya dapat mengajukan reservasi untuk kelas yang Anda ampu.',
+            ]);
+        }
         if ($courseClass && isset($data['course_id']) && $courseClass->course_id !== (int) $data['course_id']) {
             throw ValidationException::withMessages(['course_class_id' => 'Kelas tidak terdaftar pada mata kuliah yang dipilih.']);
         }
-        if ($courseClass && !isset($data['course_id'])) {
+        if ($courseClass && ! isset($data['course_id'])) {
             $data['course_id'] = $courseClass->course_id;
         }
 
@@ -160,7 +202,7 @@ class ReservationController extends Controller
             NotificationController::createNotification(
                 $admin->id,
                 'Pengajuan Reservasi Baru',
-                "{$user->name} mengajukan peminjaman ruangan " . ($room?->name ?? 'Ruangan') . " pada " . Carbon::parse($reservation->date)->format('d/m/Y') . ".",
+                "{$user->name} mengajukan peminjaman ruangan ".($room?->name ?? 'Ruangan').' pada '.Carbon::parse($reservation->date)->format('d/m/Y').'.',
                 'reservation_new',
                 '/admin/reservations'
             );
@@ -176,7 +218,7 @@ class ReservationController extends Controller
     {
         // Accept either numeric id or RSV-0001 format
         $numericId = is_numeric($id) ? $id : (int) preg_replace('/[^0-9]/', '', $id);
-        $reservationModel = Reservation::with(['user.studyProgram', 'room.building', 'room.floor', 'course.studyProgram', 'courseClass.course.studyProgram'])->findOrFail($numericId);
+        $reservationModel = Reservation::with(['user.studyProgram', 'room.building', 'room.floorRecord', 'course.studyProgram', 'courseClass.course.studyProgram'])->findOrFail($numericId);
         $user = Auth::user();
         if ($user->role !== 'admin' && (int) $reservationModel->user_id !== (int) $user->id) {
             abort(403, 'Anda tidak memiliki izin untuk melihat reservasi ini.');
@@ -190,18 +232,18 @@ class ReservationController extends Controller
     /**
      * Admin reservations management (/admin/reservations).
      */
-    public function adminIndex(Request $request)
+    public function adminIndex(Request $request, ReservationConflictDetector $conflictDetector)
     {
         $activeTab = $request->query('tab', 'pending');
         $allModels = Reservation::with([
             'user.studyProgram',
             'room.building',
-            'room.floor',
+            'room.floorRecord',
             'course.studyProgram',
             'courseClass.course.studyProgram',
         ])->latest()->get();
 
-        $all = $allModels->map(fn($r) => $this->formatReservation($r))->toArray();
+        $all = $allModels->map(fn ($r) => $this->formatReservation($r))->toArray();
 
         if ($activeTab === 'conflicts') {
             $reservations = [];
@@ -211,56 +253,37 @@ class ReservationController extends Controller
             $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['date'] === now()->format('Y-m-d')));
         } elseif ($activeTab === 'upcoming') {
             $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['date'] > now()->format('Y-m-d')));
+        } elseif ($activeTab === 'completed') {
+            $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['status'] === 'COMPLETED'));
+        } elseif ($activeTab === 'cancelled') {
+            $reservations = array_values(array_filter($all, fn (array $reservation): bool => $reservation['status'] === 'CANCELLED'));
         } else {
-            $reservations = array_values(array_filter($all, fn($r) => strtolower($r['status']) === strtolower($activeTab)));
+            $reservations = array_values(array_filter($all, fn ($r) => strtolower($r['status']) === strtolower($activeTab)));
         }
 
-        $conflicts = [];
-        $activeReservations = $allModels
-            ->whereIn('status', ['pending', 'approved'])
-            ->groupBy(fn (Reservation $reservation): string => $reservation->room_id.'|'.$reservation->date->format('Y-m-d'));
-
-        foreach ($activeReservations as $group) {
-            $ordered = $group->sortBy('start_time')->values();
-            $overlapGroup = [];
-            $groupEnd = null;
-
-            foreach ($ordered as $reservation) {
-                if ($overlapGroup === [] || $reservation->start_time < $groupEnd) {
-                    $overlapGroup[] = $reservation;
-                    if ($groupEnd === null || $reservation->end_time > $groupEnd) {
-                        $groupEnd = $reservation->end_time;
-                    }
-                    continue;
-                }
-
-                if (count($overlapGroup) > 1) {
-                    $conflicts[] = $this->formatConflictGroup($overlapGroup);
-                }
-
-                $overlapGroup = [$reservation];
-                $groupEnd = $reservation->end_time;
-            }
-
-            if (count($overlapGroup) > 1) {
-                $conflicts[] = $this->formatConflictGroup($overlapGroup);
-            }
-        }
+        $conflicts = array_map(
+            fn (array $group): array => $this->formatConflictGroup($group),
+            $conflictDetector->groups($allModels),
+        );
 
         $pendingCount = $allModels->where('status', 'pending')->count();
         $approvedCount = $allModels->where('status', 'approved')->count();
         $rejectedCount = $allModels->where('status', 'rejected')->count();
+        $completedCount = $allModels->filter(fn (Reservation $reservation): bool => $reservation->status === 'completed' || ($reservation->status === 'approved' && $reservation->date->isBefore(today())))->count();
+        $cancelledCount = $allModels->where('status', 'cancelled')->count();
         $todayCount = $allModels->where('date', today())->count();
         $upcomingCount = $allModels->filter(fn (Reservation $reservation): bool => $reservation->date->isAfter(today()))->count();
         $conflictCount = count($conflicts);
 
         return view('admin.reservations.index', compact(
-            'reservations', 
-            'conflicts', 
-            'activeTab', 
-            'pendingCount', 
-            'approvedCount', 
-            'rejectedCount', 
+            'reservations',
+            'conflicts',
+            'activeTab',
+            'pendingCount',
+            'approvedCount',
+            'rejectedCount',
+            'completedCount',
+            'cancelledCount',
             'conflictCount',
             'todayCount',
             'upcomingCount'

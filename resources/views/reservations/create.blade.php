@@ -67,7 +67,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="form-label text-xs" for="date">Tanggal Kegiatan</label>
-                        <input type="date" name="date" id="date" class="form-input" min="{{ date('Y-m-d') }}" value="{{ old('date', $date) }}" required>
+                        <input type="date" name="date" id="date" class="form-input" min="{{ today()->toDateString() }}" value="{{ old('date', $date) }}" required>
                     </div>
                     <div>
                         <label class="form-label text-xs" for="start_time">Jam Mulai</label>
