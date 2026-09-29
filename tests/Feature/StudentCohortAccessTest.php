@@ -106,6 +106,7 @@ class StudentCohortAccessTest extends TestCase
         $this->actingAs($student)
             ->get('/dashboard')
             ->assertOk()
+            ->assertSee('data-dashboard-live', false)
             ->assertSee('Jadwal Milik Cohort')
             ->assertDontSee('Jadwal Cohort Lain');
 

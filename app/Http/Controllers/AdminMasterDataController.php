@@ -79,6 +79,9 @@ class AdminMasterDataController extends Controller
         $resourceTitle = $this->resourceTitle($resource);
         $fields = $this->formFields($resource, $record === null);
         $recordValues = $record?->toArray() ?? [];
+        if ($resource === 'classes' && $record === null && request()->filled('cohort_id')) {
+            $recordValues['cohort_id'] = (int) request()->query('cohort_id');
+        }
 
         return view('admin.master.form', [
             'resource' => $resource,
@@ -119,7 +122,7 @@ class AdminMasterDataController extends Controller
             'departments' => 'Jurusan',
             'study-programs' => 'Program Studi',
             'courses' => 'Mata Kuliah',
-            'classes' => 'Kelas',
+            'classes' => 'Mata Kuliah ke Rombongan',
             'buildings' => 'Gedung',
             'floors' => 'Lantai',
             'rooms' => 'Ruangan',
@@ -202,11 +205,10 @@ class AdminMasterDataController extends Controller
                 $text('name', 'Nama Rombongan'),
             ],
             'classes' => [
+                $select('cohort_id', 'Rombongan', $cohorts),
                 $select('course_id', 'Mata Kuliah', $courses),
                 $select('lecturer_id', 'Dosen Wali', $lecturers),
-                $select('cohort_id', 'Rombongan', $cohorts),
-                $text('name', 'Nama Kelas'),
-                $text('academic_year', 'Tahun Akademik', false),
+                $text('academic_year', 'Tahun Akademik'),
             ],
             'buildings' => [
                 $select('department_id', 'Jurusan', $departments, false),
@@ -292,8 +294,8 @@ class AdminMasterDataController extends Controller
                 'course_id' => ['required', 'exists:courses,id'],
                 'lecturer_id' => ['required', Rule::exists('users', 'id')->where('role', 'dosen')],
                 'cohort_id' => ['required', 'exists:cohorts,id'],
-                'name' => ['required', 'string', 'max:255'],
-                'academic_year' => ['nullable', 'string', 'max:32'],
+                'name' => ['prohibited'],
+                'academic_year' => ['required', 'string', 'max:32'],
             ],
             'buildings' => [
                 'department_id' => ['nullable', 'exists:departments,id'],
@@ -346,6 +348,10 @@ class AdminMasterDataController extends Controller
             $data['building_id'] = $floor->building_id;
             $data['floor'] = $floor->number;
             $data['is_maintenance'] = $request->boolean('is_maintenance');
+        }
+
+        if ($resource === 'classes') {
+            $data['name'] = Cohort::findOrFail($data['cohort_id'])->name;
         }
 
         $modelClass = $this->modelClass($resource);

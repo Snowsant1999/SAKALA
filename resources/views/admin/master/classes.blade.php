@@ -13,14 +13,14 @@
         </div>
         <a href="{{ url('/admin/classes/create') }}" class="btn btn-primary text-xs shrink-0">
             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-            Tambah Kelas
+            Tambah Mata Kuliah
         </a>
     </div>
 
     {{-- Stats --}}
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="card p-5">
-            <div class="text-xs text-slate-500 mb-1">Total Kelas</div>
+            <div class="text-xs text-slate-500 mb-1">Total Rombongan</div>
             <div class="text-2xl font-bold text-navy-700">{{ count($classes) }}</div>
         </div>
         <div class="card p-5">
@@ -28,7 +28,7 @@
             <div class="text-2xl font-bold text-emerald-600">{{ collect($classes)->sum('total_students') }}</div>
         </div>
         <div class="card p-5">
-            <div class="text-xs text-slate-500 mb-1">Rata-rata / Kelas</div>
+            <div class="text-xs text-slate-500 mb-1">Rata-rata / Rombongan</div>
             <div class="text-2xl font-bold text-indigo-600">{{ count($classes) > 0 ? round(collect($classes)->sum('total_students') / count($classes)) : 0 }}</div>
         </div>
     </div>
@@ -39,32 +39,19 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Mata Kuliah</th>
-                        <th>Nama Kelas</th>
                         <th>Rombongan</th>
                         <th>Program Studi</th>
-                        <th>Tahun Akademik</th>
-                        <th>Wali Kelas</th>
                         <th>Jumlah Mahasiswa</th>
+                        <th>Tahun Akademik</th>
+                        <th>Mata Kuliah</th>
                         <th class="text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($classes as $c)
-                        <tr data-class-row>
-                            <td class="text-xs font-semibold text-slate-800">{{ $c['course'] }}</td>
-                            <td>
-                                <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
-                                        {{ substr($c['name'], 0, 2) }}
-                                    </div>
-                                    <span class="font-bold text-xs text-slate-800">{{ $c['name'] }}</span>
-                                </div>
-                            </td>
-                            <td class="text-xs text-slate-700">{{ $c['cohort'] }}</td>
+                    @forelse($classes as $c)
+                        <tr data-class-row data-cohort-row>
+                            <td class="font-bold text-xs text-slate-800">{{ $c['name'] }}</td>
                             <td class="text-xs text-slate-700">{{ $c['program'] }}</td>
-                            <td><span class="badge text-[10px]" style="background: #f0f9ff; color: #0369a1;">{{ $c['academic_year'] }}</span></td>
-                            <td class="text-xs text-slate-600">{{ $c['homeroom'] }}</td>
                             <td>
                                 <div class="flex items-center gap-2">
                                     <div class="w-16 h-1.5 rounded-full bg-slate-200 overflow-hidden">
@@ -73,18 +60,51 @@
                                     <span class="text-xs font-bold text-slate-700">{{ $c['total_students'] }}</span>
                                 </div>
                             </td>
+                            <td>
+                                @forelse($c['academic_years'] as $academicYear)
+                                    <span class="badge text-[10px]" style="background: #f0f9ff; color: #0369a1;">{{ $academicYear }}</span>
+                                @empty
+                                    <span class="text-xs text-slate-400">Belum ditentukan</span>
+                                @endforelse
+                            </td>
+                            <td>
+                                @if($c['course_classes']->isEmpty())
+                                    <span class="text-xs text-slate-400">Belum ada mata kuliah</span>
+                                @else
+                                    <details>
+                                        <summary class="cursor-pointer text-xs font-semibold text-navy-700">
+                                            {{ $c['course_classes']->count() }} mata kuliah
+                                        </summary>
+                                        <div class="mt-2 space-y-2">
+                                            @foreach($c['course_classes'] as $courseClass)
+                                                <div class="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
+                                                    <div>
+                                                        <div class="text-xs font-semibold text-slate-800">{{ $courseClass['course'] }}</div>
+                                                        <div class="text-[11px] text-slate-500">{{ $courseClass['lecturer'] }} · {{ $courseClass['academic_year'] }}</div>
+                                                    </div>
+                                                    <div class="flex shrink-0 items-center gap-2">
+                                                        <a href="{{ url('/admin/classes/'.$courseClass['id'].'/edit') }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</a>
+                                                        <form method="POST" action="{{ url('/admin/classes/'.$courseClass['id']) }}" onsubmit="return confirm('Hapus mata kuliah dari rombongan ini?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                @endif
+                            </td>
                             <td class="text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <a href="{{ url('/admin/classes/'.$c['id'].'/edit') }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</a>
-                                    <form method="POST" action="{{ url('/admin/classes/'.$c['id']) }}" onsubmit="return confirm('Hapus kelas ini?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold">Hapus</button>
-                                    </form>
-                                </div>
+                                <a href="{{ url('/admin/classes/create?cohort_id='.$c['id']) }}" class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Tambah Mata Kuliah</a>
                             </td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-xs text-slate-500">Belum ada rombongan yang terdaftar.</td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>

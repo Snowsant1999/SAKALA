@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\Cohort;
+use App\Models\CourseClass;
 use App\Models\Floor;
 use App\Models\Room;
 use App\Models\ScheduleException;
+use App\Models\StudyProgram;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DatabaseSeederTest extends TestCase
@@ -16,11 +20,24 @@ class DatabaseSeederTest extends TestCase
 
         $roomCount = Room::query()->count();
         $floorCount = Floor::query()->count();
-        $notificationCount = \DB::table('notifications')->count();
+        $notificationCount = DB::table('notifications')->count();
 
         $this->assertGreaterThan(0, $roomCount);
         $this->assertGreaterThan(0, $floorCount);
         $this->assertSame(0, Room::query()->whereNull('floor_id')->count());
+        $this->assertDatabaseHas('study_programs', [
+            'code' => 'TIM',
+            'name' => 'Teknik Informatika Multimedia',
+            'level' => 'D4',
+        ]);
+        $this->assertSame(0, CourseClass::query()->whereNull('academic_year')->count());
+
+        $timProgram = StudyProgram::where('code', 'TIM')->firstOrFail();
+        $timCohort = Cohort::where('name', 'TIM 5A')->firstOrFail();
+        $this->assertTrue($timCohort->studyProgram->is($timProgram));
+        $this->assertGreaterThan(1, CourseClass::where('course_id', CourseClass::where('name', 'TIM 5A')->value('course_id'))
+            ->distinct('cohort_id')
+            ->count('cohort_id'));
 
         foreach (Room::with('floorRecord')->get() as $room) {
             $this->assertNotNull($room->floorRecord, 'Missing floor relation for room '.$room->code);
@@ -38,7 +55,7 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame($roomCount, Room::query()->count());
         $this->assertSame($floorCount, Floor::query()->count());
-        $this->assertSame($notificationCount, \DB::table('notifications')->count());
+        $this->assertSame($notificationCount, DB::table('notifications')->count());
         $this->assertSame(1, ScheduleException::query()->count());
     }
 }

@@ -8,6 +8,7 @@
 @endsection
 
 @section('content')
+<div data-dashboard-live>
 {{-- Stats Cards --}}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     @foreach($stats as $stat)
@@ -164,5 +165,6 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 @endsection

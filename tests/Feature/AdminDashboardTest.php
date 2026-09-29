@@ -58,6 +58,7 @@ class AdminDashboardTest extends TestCase
         $this->actingAs($admin)
             ->get('/admin/dashboard')
             ->assertOk()
+            ->assertSee('data-dashboard-live', false)
             ->assertSee('1 Konflik Terdeteksi')
             ->assertSee('Laporan Darurat')
             ->assertSee('Urgent')

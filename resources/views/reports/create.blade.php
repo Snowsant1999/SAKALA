@@ -11,9 +11,9 @@
             <svg class="w-6 h-6 text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.25-8.25-3.286Zm0 13.036h.008v.008H12v-.008Z" /></svg>
         </div>
         <div class="space-y-1">
-            <h2 class="text-base font-bold text-white">Privasi & Kerahasiaan Anda Dijamin</h2>
+            <h2 class="text-base font-bold text-white">Privasi & Kerahasiaan</h2>
             <p class="text-xs text-slate-300 leading-relaxed">
-                Platform Kampus Aman SAKALA dirancang khusus untuk memberikan ruang aman bagi seluruh civitas akademika. Laporan yang Anda kirimkan bersifat <strong>rahasia (confidential)</strong>, hanya dapat diakses oleh Anda dan Satgas Penanganan Kampus yang berwenang.
+                Laporan Kampus Aman bersifat rahasia dan hanya dapat diakses oleh Anda serta admin SAKALA yang berwenang.
             </p>
         </div>
     </div>
@@ -75,7 +75,7 @@
             {{-- Security Notice --}}
             <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center gap-3">
                 <svg class="w-5 h-5 text-emerald-600 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                <span>Identitas pelapor terenkripsi dan dijaga kerahasiaannya oleh sistem.</span>
+                Nama lengkap pelapor hanya ditampilkan kepada admin SAKALA yang berwenang.
             </div>
 
             {{-- Submit Actions --}}

@@ -10,6 +10,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $academicYear = now()->year.'/'.(now()->year + 1);
+
         // Disable foreign key checks for clean truncation
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('schedule_exceptions')->truncate();
@@ -61,6 +63,14 @@ class DatabaseSeeder extends Seeder
             'department_id' => $deptTI,
             'code' => 'TRK',
             'name' => 'Teknologi Rekayasa Komputer (D4)',
+            'level' => 'D4',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $spTIM = DB::table('study_programs')->insertGetId([
+            'department_id' => $deptTI,
+            'code' => 'TIM',
+            'name' => 'Teknik Informatika Multimedia',
             'level' => 'D4',
             'created_at' => now(),
             'updated_at' => now(),
@@ -126,7 +136,7 @@ class DatabaseSeeder extends Seeder
             'role' => 'mahasiswa',
             'nim_nip' => '2105123456',
             'department_id' => $deptTI,
-            'study_program_id' => $spIF,
+            'study_program_id' => $spTIM,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -138,7 +148,7 @@ class DatabaseSeeder extends Seeder
             'role' => 'mahasiswa',
             'nim_nip' => '2105123457',
             'department_id' => $deptTI,
-            'study_program_id' => $spIF,
+            'study_program_id' => $spTIM,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -367,6 +377,7 @@ class DatabaseSeeder extends Seeder
             'course_id' => $cWeb,
             'lecturer_id' => $dosenBudi,
             'name' => 'TIM 5A',
+            'academic_year' => $academicYear,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -375,6 +386,7 @@ class DatabaseSeeder extends Seeder
             'course_id' => $cWeb,
             'lecturer_id' => $dosenBudi,
             'name' => 'TIM 5B',
+            'academic_year' => $academicYear,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -383,6 +395,7 @@ class DatabaseSeeder extends Seeder
             'course_id' => $cDB,
             'lecturer_id' => $dosenSiti,
             'name' => 'TIM 5A',
+            'academic_year' => $academicYear,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -391,6 +404,7 @@ class DatabaseSeeder extends Seeder
             'course_id' => $cRPL,
             'lecturer_id' => $dosenBudi,
             'name' => 'TIM 5A',
+            'academic_year' => $academicYear,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -399,6 +413,7 @@ class DatabaseSeeder extends Seeder
             'course_id' => $cJaringan,
             'lecturer_id' => $dosenHendra,
             'name' => 'TIM 5A',
+            'academic_year' => $academicYear,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

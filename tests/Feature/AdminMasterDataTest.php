@@ -29,20 +29,54 @@ class AdminMasterDataTest extends TestCase
 
     public function test_additional_course_classes_seeder_is_idempotent(): void
     {
+        $department = Department::create(['code' => 'TI', 'name' => 'Jurusan Teknologi Informasi']);
+        $ifProgram = StudyProgram::create([
+            'department_id' => $department->id,
+            'code' => 'IF',
+            'name' => 'Teknik Informatika (S1)',
+            'level' => 'S1',
+        ]);
+        $trkProgram = StudyProgram::create([
+            'department_id' => $department->id,
+            'code' => 'TRK',
+            'name' => 'Teknologi Rekayasa Komputer (D4)',
+            'level' => 'D4',
+        ]);
+        $timProgram = StudyProgram::create([
+            'department_id' => $department->id,
+            'code' => 'TIM',
+            'name' => 'Teknik Informatika Multimedia',
+            'level' => 'D4',
+        ]);
         $webCourse = Course::create(['code' => 'TI-401', 'name' => 'Pemrograman Web', 'credits' => 3, 'semester' => 5]);
-        $databaseCourse = Course::create(['code' => 'TI-402', 'name' => 'Basis Data Lanjut', 'credits' => 3, 'semester' => 5]);
+        $databaseCourse = Course::create([
+            'study_program_id' => $ifProgram->id,
+            'code' => 'TI-402',
+            'name' => 'Basis Data Lanjut',
+            'credits' => 3,
+            'semester' => 5,
+        ]);
         $softwareCourse = Course::create(['code' => 'TI-403', 'name' => 'Rekayasa Perangkat Lunak', 'credits' => 3, 'semester' => 5]);
         $webLecturer = User::factory()->create(['role' => 'dosen', 'nim_nip' => '198001012005011002']);
         $databaseLecturer = User::factory()->create(['role' => 'dosen', 'nim_nip' => '198503152010122001']);
 
         $this->seed(AdditionalCourseClassesSeeder::class);
+        CourseClass::where('course_id', $softwareCourse->id)
+            ->where('name', 'TI 5B')
+            ->update(['academic_year' => '2025/2026']);
         $this->seed(AdditionalCourseClassesSeeder::class);
 
         $this->assertDatabaseHas('course_classes', ['course_id' => $webCourse->id, 'name' => 'TRK 5A', 'lecturer_id' => $webLecturer->id]);
         $this->assertDatabaseHas('course_classes', ['course_id' => $databaseCourse->id, 'name' => 'TRK 5A', 'lecturer_id' => $databaseLecturer->id]);
         $this->assertDatabaseHas('course_classes', ['course_id' => $databaseCourse->id, 'name' => 'TI 5A', 'lecturer_id' => $databaseLecturer->id]);
+        $this->assertDatabaseHas('course_classes', ['course_id' => $databaseCourse->id, 'name' => 'TIM 5A', 'lecturer_id' => $databaseLecturer->id]);
         $this->assertDatabaseHas('course_classes', ['course_id' => $softwareCourse->id, 'name' => 'TI 5B', 'lecturer_id' => $webLecturer->id]);
-        $this->assertDatabaseCount('course_classes', 4);
+        $this->assertDatabaseCount('course_classes', 5);
+        $this->assertSame(3, CourseClass::where('course_id', $databaseCourse->id)->distinct('cohort_id')->count('cohort_id'));
+        $this->assertSame('2025/2026', CourseClass::where('course_id', $softwareCourse->id)->value('academic_year'));
+        $this->assertSame(0, CourseClass::whereNull('academic_year')->count());
+        $this->assertSame($timProgram->id, Cohort::where('name', 'TIM 5A')->value('study_program_id'));
+        $this->assertSame($trkProgram->id, Cohort::where('name', 'TRK 5A')->value('study_program_id'));
         $this->assertDatabaseHas('course_classes', [
             'course_id' => $webCourse->id,
             'name' => 'TRK 5A',
@@ -91,6 +125,79 @@ class AdminMasterDataTest extends TestCase
         $this->assertTrue($databaseClass->cohort->is($cohort));
         $this->assertTrue($cohort->students()->whereKey($student->id)->exists());
         $this->assertTrue($student->cohort->is($cohort));
+    }
+
+    public function test_admin_assigns_courses_from_a_cohort_and_the_class_list_groups_by_cohort(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $lecturer = User::factory()->create(['role' => 'dosen', 'status' => 'active']);
+        $webCourse = Course::create(['code' => 'MULTI-WEB', 'name' => 'Pemrograman Web', 'credits' => 3, 'semester' => 5]);
+        $databaseCourse = Course::create(['code' => 'MULTI-DB', 'name' => 'Basis Data', 'credits' => 3, 'semester' => 5]);
+        $firstCohort = Cohort::create(['name' => 'TIM 5A']);
+        $secondCohort = Cohort::create(['name' => 'TIM 5B']);
+
+        $this->actingAs($admin)
+            ->get('/admin/classes/create?cohort_id='.$firstCohort->id)
+            ->assertOk()
+            ->assertSee('Tambah Mata Kuliah ke Rombongan')
+            ->assertSee('name="cohort_id"', false)
+            ->assertSee('<option value="'.$firstCohort->id.'" selected>TIM 5A</option>', false)
+            ->assertSee('Pemrograman Web');
+
+        foreach ([
+            [$webCourse, $firstCohort],
+            [$databaseCourse, $firstCohort],
+            [$webCourse, $secondCohort],
+        ] as [$course, $cohort]) {
+            $this->post('/admin/classes', [
+                'course_id' => $course->id,
+                'lecturer_id' => $lecturer->id,
+                'cohort_id' => $cohort->id,
+                'academic_year' => '2026/2027',
+            ])
+                ->assertRedirect('/admin/classes')
+                ->assertSessionHas('success');
+        }
+
+        $this->assertDatabaseCount('course_classes', 3);
+        $this->assertDatabaseHas('course_classes', [
+            'course_id' => $webCourse->id,
+            'cohort_id' => $firstCohort->id,
+            'name' => $firstCohort->name,
+            'academic_year' => '2026/2027',
+        ]);
+        $this->assertDatabaseHas('course_classes', [
+            'course_id' => $webCourse->id,
+            'cohort_id' => $secondCohort->id,
+            'name' => $secondCohort->name,
+            'academic_year' => '2026/2027',
+        ]);
+
+        $response = $this->get('/admin/classes')
+            ->assertOk()
+            ->assertSee('Pemrograman Web')
+            ->assertSee('Basis Data')
+            ->assertSee('2026/2027');
+
+        $this->assertSame(2, substr_count($response->getContent(), 'data-cohort-row'));
+    }
+
+    public function test_admin_cannot_create_a_course_class_without_an_academic_year(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $lecturer = User::factory()->create(['role' => 'dosen', 'status' => 'active']);
+        $course = Course::create(['code' => 'NO-YEAR', 'name' => 'Mata Kuliah Tanpa Tahun', 'credits' => 3, 'semester' => 1]);
+        $cohort = Cohort::create(['name' => 'IF 1A']);
+
+        $this->actingAs($admin)
+            ->post('/admin/classes', [
+                'course_id' => $course->id,
+                'lecturer_id' => $lecturer->id,
+                'cohort_id' => $cohort->id,
+            ])
+            ->assertSessionHasErrors('academic_year');
+
+        $this->assertDatabaseCount('course_classes', 0);
     }
 
     public function test_admin_can_change_a_students_classes_from_the_student_edit_form(): void
@@ -207,6 +314,35 @@ class AdminMasterDataTest extends TestCase
             'name' => 'Jurusan Uji',
             'head_name' => 'Kepala Uji',
         ]);
+    }
+
+    public function test_admin_can_view_department_with_program_and_student_counts(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $department = Department::create(['code' => 'COUNT-DEP', 'name' => 'Jurusan Hitung']);
+        StudyProgram::create([
+            'department_id' => $department->id,
+            'code' => 'COUNT-PROG',
+            'name' => 'Program Hitung',
+            'level' => 'S1',
+        ]);
+        User::factory()->create([
+            'department_id' => $department->id,
+            'role' => 'mahasiswa',
+            'status' => 'active',
+        ]);
+        User::factory()->create([
+            'department_id' => $department->id,
+            'role' => 'dosen',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/admin/departments')
+            ->assertOk()
+            ->assertSee('Jurusan Hitung')
+            ->assertSee('1 Prodi')
+            ->assertSee('1 Orang');
     }
 
     public function test_department_with_programs_cannot_be_deleted(): void

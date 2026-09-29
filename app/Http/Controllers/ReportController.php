@@ -17,7 +17,7 @@ class ReportController extends Controller
     /**
      * Format Report model for view compatibility.
      */
-    private function formatReport(Report $r): array
+    private function formatReport(Report $r, bool $showReporterIdentity = false): array
     {
         $viewStatus = match ($r->status) {
             'pending' => 'SUBMITTED',
@@ -76,13 +76,29 @@ class ReportController extends Controller
             'priority' => strtoupper($r->priority ?? 'medium'),
             'admin_note' => $r->admin_notes,
             'attachments' => $r->attachment_path ? basename($r->attachment_path) : 'Tidak ada lampiran',
-            'reporter_name' => $r->reporter?->name ?? 'Anonim',
-            'reporter_email' => $r->reporter?->email ?? '',
-            'reporter_nim' => $r->reporter?->nim_nip ?? '—',
+            'has_attachment' => $r->attachment_path !== null && $r->attachment_path !== '',
+            'reporter_name' => $showReporterIdentity
+                ? ($r->reporter?->name ?? 'Anonim')
+                : $this->reporterInitials($r->reporter?->name),
+            'reporter_email' => $showReporterIdentity ? ($r->reporter?->email ?? '') : '',
+            'reporter_nim' => $showReporterIdentity ? ($r->reporter?->nim_nip ?? '—') : '—',
             'reporter_role' => ucfirst($r->reporter?->role ?? 'Mahasiswa'),
             'created_at' => Carbon::parse($r->created_at)->translatedFormat('d F Y, H:i'),
             'timeline' => $timeline,
         ];
+    }
+
+    private function reporterInitials(?string $name): string
+    {
+        $parts = preg_split('/\s+/u', trim($name ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+
+        if (! $parts) {
+            return 'Anonim';
+        }
+
+        return collect(array_slice($parts, 0, 2))
+            ->map(fn (string $part): string => mb_strtoupper(mb_substr($part, 0, 1)).'.')
+            ->implode(' ');
     }
 
     /**
@@ -173,7 +189,7 @@ class ReportController extends Controller
             );
         }
 
-        return redirect('/reports/'.$report->id)->with('success', 'Laporan Anda telah berhasil dikirim dengan aman dan privasi terjamin.');
+        return redirect('/reports/'.$report->id)->with('success', 'Laporan berhasil dikirim. Nama lengkap Anda hanya dapat dilihat oleh admin SAKALA.');
     }
 
     /**
@@ -190,7 +206,7 @@ class ReportController extends Controller
             abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk melihat laporan ini.');
         }
 
-        $report = $this->formatReport($reportModel);
+        $report = $this->formatReport($reportModel, $user->role === 'admin');
 
         return view('reports.show', compact('report'));
     }
@@ -242,7 +258,7 @@ class ReportController extends Controller
         $inProgressCount = (clone $allReports)->where('status', 'in_progress')->count();
         $submittedCount = $allReports->where('status', 'pending')->count();
 
-        $reports = $query->get()->map(fn ($r) => $this->formatReport($r))->toArray();
+        $reports = $query->get()->map(fn ($r) => $this->formatReport($r, true))->toArray();
 
         return view('admin.reports.index', compact(
             'reports',

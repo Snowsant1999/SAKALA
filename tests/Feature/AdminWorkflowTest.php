@@ -8,10 +8,12 @@ use App\Models\AssignmentSubmission;
 use App\Models\Building;
 use App\Models\Course;
 use App\Models\CourseClass;
+use App\Models\Report;
 use App\Models\Reservation;
 use App\Models\Room;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminWorkflowTest extends TestCase
@@ -83,6 +85,7 @@ class AdminWorkflowTest extends TestCase
         $this->actingAs($lecturer)
             ->get('/dashboard')
             ->assertOk()
+            ->assertSee('data-dashboard-live', false)
             ->assertSee('Dashboard Dosen')
             ->assertSee('Pengelolaan Kelas')
             ->assertSee('Pengumpulan Tugas Terbaru')
@@ -104,7 +107,7 @@ class AdminWorkflowTest extends TestCase
             ])
             ->assertRedirect();
 
-        $report = \App\Models\Report::query()->where('reporter_id', $student->id)->firstOrFail();
+        $report = Report::query()->where('reporter_id', $student->id)->firstOrFail();
 
         $this->actingAs($admin)
             ->post('/admin/reports/'.$report->id.'/update', [
@@ -125,6 +128,112 @@ class AdminWorkflowTest extends TestCase
             ->get('/reports/'.$report->id)
             ->assertOk()
             ->assertSee('Sedang Ditangani Satgas');
+    }
+
+    public function test_reporter_identity_is_only_shown_to_admins(): void
+    {
+        $reporter = User::factory()->create([
+            'name' => 'Siti Nurhaliza',
+            'role' => 'mahasiswa',
+            'status' => 'active',
+        ]);
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $report = Report::create([
+            'reporter_id' => $reporter->id,
+            'category' => 'Intimidasi',
+            'incident_date' => today(),
+            'location' => 'Gedung Uji',
+            'description' => 'Laporan pengujian privasi.',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+
+        $this->actingAs($reporter)
+            ->withSession(['user_role' => 'mahasiswa'])
+            ->get('/reports/'.$report->id)
+            ->assertOk()
+            ->assertDontSee('Siti Nurhaliza');
+
+        $this->actingAs($admin)
+            ->withSession(['user_role' => 'admin'])
+            ->get('/reports/'.$report->id)
+            ->assertOk()
+            ->assertSee('Siti Nurhaliza');
+    }
+
+    public function test_reporter_and_admin_can_download_private_report_attachments(): void
+    {
+        Storage::fake('local');
+        $reporter = User::factory()->create(['role' => 'mahasiswa', 'status' => 'active']);
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $attachmentPath = 'report-attachments/bukti-pendukung.pdf';
+        Storage::disk('local')->put($attachmentPath, 'private evidence');
+        $report = Report::create([
+            'reporter_id' => $reporter->id,
+            'category' => 'Intimidasi',
+            'incident_date' => today(),
+            'location' => 'Gedung Uji',
+            'description' => 'Laporan dengan lampiran.',
+            'attachment_path' => $attachmentPath,
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/reports/'.$report->id)
+            ->assertOk()
+            ->assertSee('/reports/'.$report->id.'/attachment', false)
+            ->assertSee('bukti-pendukung.pdf');
+
+        $this->actingAs($reporter)
+            ->get('/reports/'.$report->id.'/attachment')
+            ->assertDownload('bukti-pendukung.pdf');
+
+        $this->actingAs($admin)
+            ->get('/reports/'.$report->id.'/attachment')
+            ->assertDownload('bukti-pendukung.pdf');
+    }
+
+    public function test_unrelated_users_and_guests_cannot_download_report_attachments(): void
+    {
+        $reporter = User::factory()->create(['role' => 'mahasiswa', 'status' => 'active']);
+        $otherUser = User::factory()->create(['role' => 'mahasiswa', 'status' => 'active']);
+        $report = Report::create([
+            'reporter_id' => $reporter->id,
+            'category' => 'Intimidasi',
+            'incident_date' => today(),
+            'location' => 'Gedung Uji',
+            'description' => 'Laporan dengan lampiran privat.',
+            'attachment_path' => 'report-attachments/privat.pdf',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+        $attachmentUrl = '/reports/'.$report->id.'/attachment';
+
+        $this->get($attachmentUrl)->assertRedirect('/login');
+
+        $this->actingAs($otherUser)
+            ->get($attachmentUrl)
+            ->assertForbidden();
+    }
+
+    public function test_missing_report_attachment_returns_not_found(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $report = Report::create([
+            'reporter_id' => User::factory()->create(['role' => 'mahasiswa'])->id,
+            'category' => 'Intimidasi',
+            'incident_date' => today(),
+            'location' => 'Gedung Uji',
+            'description' => 'Laporan tanpa file pada disk.',
+            'attachment_path' => 'report-attachments/missing.pdf',
+            'status' => 'pending',
+            'priority' => 'medium',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/reports/'.$report->id.'/attachment')
+            ->assertNotFound();
     }
 
     public function test_student_can_submit_aspiration_and_admin_can_close_it(): void

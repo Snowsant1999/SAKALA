@@ -19,6 +19,11 @@ class Department extends Model
         return $this->hasMany(User::class)->where('role', 'dosen');
     }
 
+    public function students(): HasMany
+    {
+        return $this->hasMany(User::class)->where('role', 'mahasiswa');
+    }
+
     public function buildings(): HasMany
     {
         return $this->hasMany(Building::class);

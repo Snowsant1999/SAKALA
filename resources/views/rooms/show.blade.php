@@ -65,7 +65,7 @@
         <form action="{{ url('/rooms/'.$room['id']) }}" method="GET" class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
             <div class="w-full sm:max-w-xs">
                 <label class="form-label text-xs" for="room-date">Tanggal ketersediaan</label>
-                <input type="date" name="date" id="room-date" class="form-input" min="{{ today()->toDateString() }}" value="{{ $selectedDate }}">
+                <input type="date" name="date" id="room-date" class="form-input" min="{{ today()->toDateString() }}" value="{{ $selectedDate }}" onchange="this.form.submit()">
             </div>
             <button type="submit" class="btn btn-secondary">Lihat Jadwal</button>
         </form>

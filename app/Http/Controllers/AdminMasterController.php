@@ -165,19 +165,25 @@ class AdminMasterController extends Controller
 
     public function classes()
     {
-        $classes = CourseClass::with(['course.studyProgram', 'lecturer', 'cohort'])
+        $classes = Cohort::with(['studyProgram', 'courseClasses.course', 'courseClasses.lecturer'])
             ->withCount('students')
+            ->orderBy('name')
             ->get()
-            ->map(function ($cls) {
+            ->map(function (Cohort $cohort): array {
+                $courseClasses = $cohort->courseClasses->map(fn (CourseClass $courseClass): array => [
+                    'id' => $courseClass->id,
+                    'course' => $courseClass->course?->name ?? 'Mata Kuliah',
+                    'lecturer' => $courseClass->lecturer?->name ?? 'Belum ditetapkan',
+                    'academic_year' => $courseClass->academic_year ?: 'Belum ditentukan',
+                ])->values();
+
                 return [
-                    'id' => $cls->id,
-                    'name' => $cls->name,
-                    'course' => $cls->course?->name ?? 'Mata Kuliah',
-                    'cohort' => $cls->cohort?->name ?? 'Belum ditautkan',
-                    'program' => $cls->cohort?->studyProgram?->name ?? $cls->course?->studyProgram?->name ?? 'Belum ditautkan',
-                    'academic_year' => $cls->academic_year ?? 'Belum ditentukan',
-                    'homeroom' => $cls->lecturer?->name ?? 'Belum ditetapkan',
-                    'total_students' => $cls->students_count,
+                    'id' => $cohort->id,
+                    'name' => $cohort->name,
+                    'program' => $cohort->studyProgram?->name ?? 'Belum ditentukan',
+                    'academic_years' => $courseClasses->pluck('academic_year')->filter()->unique()->values(),
+                    'course_classes' => $courseClasses,
+                    'total_students' => $cohort->students_count,
                 ];
             });
 

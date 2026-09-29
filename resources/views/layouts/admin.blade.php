@@ -315,25 +315,6 @@
             return div.innerHTML;
         }
 
-        // Initial check for unread badge on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            fetch('{{ url("/notifications") }}', {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.unread_count > 0) {
-                    document.getElementById('notif-badge')?.classList.remove('hidden');
-                    const unreadLabel = document.getElementById('notif-unread-count');
-                    if (unreadLabel) {
-                        unreadLabel.classList.remove('hidden');
-                        unreadLabel.innerText = `${data.unread_count} Baru`;
-                    }
-                }
-            })
-            .catch(() => {});
-        });
-
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');

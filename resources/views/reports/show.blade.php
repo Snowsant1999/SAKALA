@@ -75,8 +75,8 @@
                             <div class="font-medium text-slate-700">{{ $report['reporter_role'] }} ({{ $report['reporter_nim'] ?? '-' }})</div>
                         </div>
                         <div>
-                            <span class="text-slate-400">Opsi Privasi:</span>
-                            <div class="font-semibold text-slate-700">{{ ($report['is_anonymous'] ?? false) ? '🛡️ Anonim bagi Publik' : '👤 Terbuka' }}</div>
+                            <span class="text-slate-400">Privasi Identitas:</span>
+                            <div class="font-semibold text-slate-700">Nama lengkap hanya ditampilkan kepada admin SAKALA.</div>
                         </div>
                         <div>
                             <span class="text-slate-400">Waktu Dibuat:</span>
@@ -118,7 +118,7 @@
                     <div class="text-xs text-slate-400 mb-1">Bukti Lampiran:</div>
                     <div class="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 flex items-center justify-between">
                         <span>📎 {{ $report['attachments'] ?? 'Tidak ada lampiran' }}</span>
-                        @if(!empty($report['attachment_path']))
+                        @if($report['has_attachment'])
                             <a href="{{ url('/reports/'.$report['raw_id'].'/attachment') }}" class="text-navy-600 font-semibold hover:underline">Unduh</a>
                         @endif
                     </div>

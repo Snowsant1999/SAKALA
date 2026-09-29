@@ -106,6 +106,7 @@ class RoomAvailabilityTest extends TestCase
             ->assertSee('Status Tanggal Terpilih')
             ->assertSee('name="date"', false)
             ->assertSee('min="'.today()->toDateString().'"', false)
+            ->assertSee('onchange="this.form.submit()"', false)
             ->assertSee($selectedDate)
             ->assertSee('Reservasi: Praktikum yang disetujui')
             ->assertSee('Teknik Informatika Uji 5A Uji')
