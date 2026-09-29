@@ -102,7 +102,7 @@
                         <select name="course_class_id" id="course_class_id" class="form-select">
                             <option value="">Tidak terkait kelas</option>
                             @foreach($classes as $class)
-                                <option value="{{ $class['id'] }}" data-course-id="{{ $class['course_id'] }}" @selected((string) old('course_class_id') === (string) $class['id'])>{{ $class['name'] }} · {{ $class['course'] }}</option>
+                                <option value="{{ $class['id'] }}" data-course-id="{{ $class['course_id'] }}" @selected((string) old('course_class_id') === (string) $class['id'])>{{ $class['name'] }}</option>
                             @endforeach
                         </select>
                     </div>

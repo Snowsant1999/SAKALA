@@ -231,16 +231,24 @@ class StudentCohortAccessTest extends TestCase
         $this->assertFalse($class->students()->whereKey($student->id)->exists());
     }
 
-    public function test_reservation_form_only_lists_cohort_classes_and_rejects_other_cohort(): void
+    public function test_reservation_form_scopes_class_options_and_allows_general_student_reservations(): void
     {
         $studentCohort = Cohort::create(['name' => 'IF 5A']);
         $otherCohort = Cohort::create(['name' => 'TRK 5A']);
+        /** @var User $student */
         $student = User::factory()->create(['role' => 'mahasiswa', 'status' => 'active', 'cohort_id' => $studentCohort->id]);
+        /** @var User $lecturer */
         $lecturer = User::factory()->create(['role' => 'dosen', 'status' => 'active']);
         $ownCourse = Course::create(['code' => 'IF-RES', 'name' => 'Reservasi IF', 'credits' => 3, 'semester' => 5]);
         $otherCourse = Course::create(['code' => 'TRK-RES', 'name' => 'Reservasi TRK', 'credits' => 3, 'semester' => 5]);
-        CourseClass::create([
+        $studentClass = CourseClass::create([
             'course_id' => $ownCourse->id,
+            'lecturer_id' => $lecturer->id,
+            'cohort_id' => $studentCohort->id,
+            'name' => $studentCohort->name,
+        ]);
+        $otherStudentClass = CourseClass::create([
+            'course_id' => $otherCourse->id,
             'lecturer_id' => $lecturer->id,
             'cohort_id' => $studentCohort->id,
             'name' => $studentCohort->name,
@@ -264,8 +272,21 @@ class StudentCohortAccessTest extends TestCase
             ->get('/reservations/create')
             ->assertOk()
             ->assertSee('Reservasi IF')
-            ->assertDontSee('Reservasi TRK');
+            ->assertSee('value="'.$studentClass->id.'" data-course-id="'.$ownCourse->id.'"', false)
+            ->assertSee('value="'.$otherStudentClass->id.'" data-course-id="'.$otherCourse->id.'"', false)
+            ->assertSee('IF 5A</option>', false)
+            ->assertDontSee('IF 5A · Reservasi IF')
+            ->assertDontSee('value="'.$otherClass->id.'" data-course-id="'.$otherCourse->id.'"', false);
 
+        $this->actingAs($lecturer)
+            ->get('/reservations/create')
+            ->assertOk()
+            ->assertSee('value="'.$studentClass->id.'" data-course-id="'.$ownCourse->id.'"', false)
+            ->assertSee('value="'.$otherStudentClass->id.'" data-course-id="'.$otherCourse->id.'"', false)
+            ->assertSee('value="'.$otherClass->id.'" data-course-id="'.$otherCourse->id.'"', false)
+            ->assertDontSee('TRK 5A · Basis Data Cohort Lain');
+
+        $this->actingAs($student);
         $this->post('/reservations', [
             'room_id' => $room->id,
             'course_id' => $otherCourse->id,
@@ -280,5 +301,31 @@ class StudentCohortAccessTest extends TestCase
             'user_id' => $student->id,
             'room_id' => $room->id,
         ]);
+
+        $this->post('/reservations', [
+            'room_id' => $room->id,
+            'date' => today()->addDay()->format('Y-m-d'),
+            'start_time' => '13:00',
+            'end_time' => '15:00',
+            'purpose' => 'Reservasi kegiatan umum',
+        ])->assertRedirect('/reservations')
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('reservations', [
+            'user_id' => $student->id,
+            'room_id' => $room->id,
+            'course_id' => null,
+            'course_class_id' => null,
+            'purpose' => 'Reservasi kegiatan umum',
+        ]);
+
+        $this->post('/reservations', [
+            'room_id' => $room->id,
+            'course_id' => $ownCourse->id,
+            'date' => today()->addDay()->format('Y-m-d'),
+            'start_time' => '15:00',
+            'end_time' => '17:00',
+            'purpose' => 'Reservasi mata kuliah tanpa kelas',
+        ])->assertSessionHasErrors('course_class_id');
     }
 }

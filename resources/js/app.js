@@ -1,5 +1,37 @@
 const sidebarNavigation = document.querySelector('.sidebar-nav');
 
+const reservationCourseSelect = document.querySelector('#course_id');
+const reservationClassSelect = document.querySelector('#course_class_id');
+
+if (reservationCourseSelect && reservationClassSelect) {
+	const reservationClassOptions = Array.from(reservationClassSelect.options)
+		.filter((option) => option.dataset.courseId);
+
+	const updateReservationClasses = (resetSelection = false) => {
+		const selectedCourseId = reservationCourseSelect.value;
+
+		if (resetSelection) {
+			reservationClassSelect.value = '';
+		}
+
+		reservationClassOptions.forEach((option) => {
+			const isAvailable = selectedCourseId !== '' && option.dataset.courseId === selectedCourseId;
+
+			option.hidden = !isAvailable;
+			option.disabled = !isAvailable;
+		});
+
+		const selectedClass = reservationClassSelect.selectedOptions[0];
+
+		if (selectedClass?.dataset.courseId && selectedClass.dataset.courseId !== selectedCourseId) {
+			reservationClassSelect.value = '';
+		}
+	};
+
+	reservationCourseSelect.addEventListener('change', () => updateReservationClasses(true));
+	updateReservationClasses();
+}
+
 if (sidebarNavigation) {
 	const scrollStorageKey = 'sakala-sidebar-scroll';
 	const savedScrollTop = sessionStorage.getItem(scrollStorageKey);

@@ -127,7 +127,6 @@ class ReservationController extends Controller
             'id' => $class->id,
             'name' => $class->name,
             'course_id' => $class->course_id,
-            'course' => $class->course?->name ?? 'Mata Kuliah',
         ])->all();
 
         return view('reservations.create', compact('room', 'roomId', 'rooms', 'date', 'startTime', 'endTime', 'courses', 'classes'));
@@ -154,7 +153,9 @@ class ReservationController extends Controller
 
         if ($user->role === 'mahasiswa') {
             $belongsToCohort = $courseClass !== null && $courseClass->cohort_id === $user->cohort_id;
-            if (! $belongsToCohort) {
+            $courseRequiresClass = isset($data['course_id']) && $courseClass === null;
+
+            if (($courseClass !== null && ! $belongsToCohort) || $courseRequiresClass) {
                 throw ValidationException::withMessages([
                     'course_class_id' => 'Pilih kelas mata kuliah dari rombongan Anda.',
                 ]);
